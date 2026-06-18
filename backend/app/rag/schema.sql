@@ -9,8 +9,12 @@ create table if not exists kb_documents (
   created_at timestamptz default now()
 );
 
+-- HNSW: high recall with no list-count tuning and no post-insert training step.
+-- ivfflat with many lists over a tiny KB (~20-40 chunks) leaves most lists empty and a
+-- single-probe query finds little; HNSW is the right tool at this scale and stays fast as it grows.
+-- (At this size exact <=> search is already sub-millisecond even without an index.)
 create index if not exists kb_documents_embedding_idx
-  on kb_documents using ivfflat (embedding vector_cosine_ops) with (lists = 100);
+  on kb_documents using hnsw (embedding vector_cosine_ops);
 
 create or replace function match_documents(
   query_embedding vector(1536),
