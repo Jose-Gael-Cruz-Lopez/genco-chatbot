@@ -49,7 +49,8 @@ Work through these items in order before going live. Check each box once verifie
 ## Reliability
 
 - [ ] `DAILY_COST_CAP_USD` is set to a value appropriate for expected traffic (e.g., `10.0`).
-  Confirm the fallback model (`OPENROUTER_MODEL_FALLBACK`) triggers when the cap is hit.
+  Confirm the cost-cap path returns the static unavailable message (it does NOT call the fallback
+  model). The fallback model (`OPENROUTER_MODEL_FALLBACK`) triggers only on primary model failure.
 
 ---
 

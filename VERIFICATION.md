@@ -106,8 +106,9 @@ low scores indicate KB gaps; re-ingest after editing the markdown files.
 the same IP. Expected: requests beyond the limit return HTTP 429.
 
 **Cost cap:** temporarily set `DAILY_COST_CAP_USD=0.00001` in `.env` and restart the server,
-then send a chat message. Expected: the reply uses the fallback model or returns the cost-cap
-error message. Restore `DAILY_COST_CAP_USD` to the real value afterward.
+then send a chat message. Expected: the reply is the static cost-cap message ("I'm momentarily
+unavailable…") — the fallback model is NOT invoked on cost-cap, only on primary model failure.
+Restore `DAILY_COST_CAP_USD` to the real value afterward.
 
 ---
 

@@ -75,7 +75,7 @@ dashboard as service environment variables.
 |---|---|---|
 | `OPENROUTER_API_KEY` | API key for LLM chat completions | [openrouter.ai](https://openrouter.ai) → Keys |
 | `OPENROUTER_MODEL` | Primary model (default: `anthropic/claude-3.5-sonnet`) | OpenRouter model list |
-| `OPENROUTER_MODEL_FALLBACK` | Fallback model on primary failure or cost-cap (default: `openai/gpt-4o-mini`) | OpenRouter model list |
+| `OPENROUTER_MODEL_FALLBACK` | Fallback model used when the primary model call fails after retries (default: `openai/gpt-4o-mini`). Note: the daily cost cap returns a static message — it does NOT invoke the fallback model. | OpenRouter model list |
 | `EMBEDDING_API_KEY` | OpenAI API key used **only** for embeddings | [platform.openai.com](https://platform.openai.com) → API Keys |
 | `EMBEDDING_MODEL` | Embedding model (default: `text-embedding-3-small`) | OpenAI docs |
 | `SUPABASE_URL` | Your Supabase project URL (`https://xxxx.supabase.co`) | Supabase dashboard → Project Settings → API |
@@ -272,8 +272,10 @@ Open [cloud.langfuse.com](https://cloud.langfuse.com) and navigate to your proje
 ## Managing Cost
 
 - `DAILY_COST_CAP_USD` (default `10.0`) is a hard daily cap. When the cap is hit, the backend
-  switches to `OPENROUTER_MODEL_FALLBACK` or returns a cost-cap error. Adjust the cap in the
-  Render environment variables.
+  returns a static cost-cap message ("I'm momentarily unavailable…") — it does NOT call the
+  fallback model. The fallback model (`OPENROUTER_MODEL_FALLBACK`) is invoked only when the
+  primary model call fails after its internal retries. Adjust the cap in the Render environment
+  variables.
 - To reduce cost per turn, switch `OPENROUTER_MODEL` to a cheaper model (e.g. `openai/gpt-4o-mini`).
   The fallback model is already cheap by default.
 - Monitor actual spend in LangFuse and in your OpenRouter billing dashboard.
