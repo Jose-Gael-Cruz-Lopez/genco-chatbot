@@ -13,6 +13,9 @@ Work through these items in order before going live. Check each box once verifie
           data-backend-url="https://YOUR-BACKEND-HOST"></script>
   ```
   Replace `YOUR-BACKEND-HOST` with the actual Render (or Railway/Fly) service URL.
+- [ ] Widget JS is reachable in production: `curl -I <embed src URL>` returns HTTP 200
+  (confirms `widget/dist/` was bundled into the image or the CDN URL is live — catches the
+  silent 404 described in README.md "Serving the widget in production").
 
 ---
 

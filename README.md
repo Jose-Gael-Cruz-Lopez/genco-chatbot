@@ -133,6 +133,86 @@ The `widget.js` file is served by the backend's `/widget` static-files mount
 (`backend/app/main.py`) — no separate CDN setup required (though CDN hosting is a valid
 alternative if you want to decouple widget deploys from backend deploys).
 
+### Serving the widget in production
+
+**The gap:** `backend/app/main.py` mounts `widget/dist/` via a path resolved relative to the
+repo root (`Path(__file__).resolve().parent.parent.parent / "widget" / "dist"`). In local
+development this works because both `backend/` and `widget/dist/` are present on disk. In
+production, however, the Docker image is built with `backend/` as the build context
+(`render.yaml`: `dockerContext: .`, evaluated from the `backend/` directory). The Dockerfile's
+`COPY . .` therefore copies only the contents of `backend/` — `widget/dist/` is never included.
+At startup the `if _widget_dir.exists()` guard silently skips the mount, and
+`GET /widget/widget.js` returns **404** even though the embed snippet points there.
+
+Choose one of the two remedies below before going live:
+
+---
+
+**Option 1 — Bundle the widget into the backend Docker image**
+
+Build the Docker image from the **repository root** so both `backend/` and `widget/dist/` are
+available to the build context.
+
+1. In `backend/render.yaml`, change `dockerContext` from `.` to `..` (the repo root):
+
+   ```yaml
+   dockerfilePath: ./backend/Dockerfile
+   dockerContext: ..
+   ```
+
+2. Update `backend/Dockerfile` so its `COPY` paths account for the new context root:
+
+   ```dockerfile
+   FROM python:3.11-slim
+   WORKDIR /app
+   # Copy and install Python dependencies
+   COPY backend/requirements.txt .
+   RUN pip install --no-cache-dir -r requirements.txt
+   # Copy backend application code
+   COPY backend/ .
+   # Copy pre-built widget so the /widget static mount is satisfied
+   COPY widget/dist/ widget/dist/
+   EXPOSE 8000
+   HEALTHCHECK CMD python -c "import urllib.request;urllib.request.urlopen('http://localhost:8000/health')"
+   CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+   ```
+
+   The `COPY widget/dist/ widget/dist/` line places the built widget at
+   `/app/widget/dist/` inside the container, which is exactly where `main.py`'s
+   three-`parent`-level path resolves to (`/app` is the `WORKDIR`).
+
+3. If you build the image manually (e.g. for local testing), run from the repo root:
+
+   ```bash
+   # from repo root, not backend/
+   docker build -f backend/Dockerfile -t genco-chatbot .
+   docker run -p 8000:8000 --env-file .env genco-chatbot
+   ```
+
+**Important:** run `npm run build` (or the equivalent build step) inside `widget/` to produce
+`widget/dist/widget.js` **before** running the Docker build, otherwise the `COPY` will fail.
+
+---
+
+**Option 2 — Host widget.js on a CDN / static host (simpler)**
+
+Upload `widget/dist/widget.js` to any static hosting service (e.g. Cloudflare Pages, Netlify,
+AWS S3 + CloudFront, GitHub Pages). The backend serves only the API; only the `src` in the
+embed snippet changes.
+
+Adjusted embed snippet (replace `YOUR-CDN-HOST` and `YOUR-BACKEND-HOST`):
+
+```html
+<script src="https://YOUR-CDN-HOST/widget.js"
+        data-backend-url="https://YOUR-BACKEND-HOST"></script>
+```
+
+- `src` points to the CDN URL where `widget.js` is hosted.
+- `data-backend-url` still points at the FastAPI backend — widget POST requests go there.
+
+This approach decouples widget releases from backend deploys: you can update the widget by
+re-uploading to the CDN without triggering a backend redeploy.
+
 ---
 
 ## Adding / Updating Knowledge Base Content
