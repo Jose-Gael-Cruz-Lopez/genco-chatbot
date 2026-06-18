@@ -291,6 +291,55 @@ If either notification fails, the Supabase row persists with `emailed=false` or
 
 ---
 
+## Optional ML Enhancements
+
+Two opt-in enhancements live behind `backend/requirements-ml.txt`. They are **not** installed by
+default, so the core app, the default Docker image, and the standard test suite carry zero extra
+dependencies. Install them only when you want them:
+
+```bash
+pip install -r backend/requirements-ml.txt
+```
+
+> Heads-up: these pull in heavy deps (`llm-guard` → transformers/torch; `deepeval` → a judge LLM).
+> `torch` may lack wheels on the newest Python — install in a Python 3.11–3.12 env (matching the
+> production image) or in CI.
+
+### ML prompt-injection scanning (LLM Guard)
+
+`backend/app/injection_scanner.py` wraps LLM Guard's `PromptInjection` scanner and runs **in front
+of** the substring guard in `chat/router.py`:
+
+```python
+if guardrails.is_injection_attempt(req.message) or injection_scanner.is_injection(req.message):
+    ...  # decline
+```
+
+It is **lazy and graceful**: the model loads on first use and is cached; if `llm-guard` isn't
+installed (or the model fails to load), `is_injection()` returns `False` and the substring guard
+remains the active defense — the app runs unchanged. To enable it in production, add
+`requirements-ml.txt` to the image build and redeploy. Only the `PromptInjection` scanner is
+enabled (latency scales with scanner count).
+
+### Faithfulness CI gate (DeepEval)
+
+`backend/tests/test_faithfulness_eval.py` uses an LLM judge to score whether answers are *faithful*
+to the retrieved KB context (catching hallucination that `run_eval.py`'s keyword routing can't).
+It self-skips unless DeepEval is installed **and** a judge key is set, so it gates CI only where
+those are present:
+
+```bash
+pip install -r backend/requirements-ml.txt
+export OPENAI_API_KEY=...                  # judge model
+export DEEPEVAL_JUDGE_MODEL=gpt-4.1-mini   # optional override (default)
+pytest backend/tests/test_faithfulness_eval.py -v
+```
+
+A faithfulness score below `0.7` fails the build. `run_eval.py` (routing/grounding-score check)
+remains the lightweight, no-key eval; DeepEval is the deeper, judge-based gate.
+
+---
+
 ## Project Structure
 
 ```

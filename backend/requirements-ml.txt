@@ -1,0 +1,15 @@
+# OPTIONAL ML enhancements — NOT required by the core app or the default test suite.
+#
+# Install only when you want the ML prompt-injection scanner active in production and/or the
+# DeepEval faithfulness CI gate to run:
+#     pip install -r backend/requirements-ml.txt
+#
+# Heads-up: these pull in heavy dependencies.
+#   * llm-guard -> transformers + torch (CPU inference is fine; no GPU needed). Latency scales
+#     with the number of scanners enabled — this project enables only PromptInjection.
+#   * deepeval  -> requires a judge LLM at runtime (e.g. OPENAI_API_KEY).
+# torch may not have wheels on the very newest Python releases; install these in a Python
+# 3.11–3.12 environment (matches the production Docker image) or in CI.
+
+llm-guard
+deepeval

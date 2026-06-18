@@ -108,7 +108,9 @@ low scores indicate KB gaps; re-ingest after editing the markdown files.
 ## 7. Rate-limit and cost-cap fallbacks
 
 **Rate limit:** send more than `RATE_LIMIT_PER_MINUTE` (default 20) requests in one minute from
-the same IP. Expected: requests beyond the limit return HTTP 429.
+the same client IP (the limiter keys on `X-Forwarded-For`, so rotating/omitting `session_id` does
+NOT bypass it). Expected: requests beyond the limit return HTTP 200 with the friendly throttle
+message ("You're sending messages quickly — give me a moment and try again.").
 
 **Cost cap:** temporarily set `DAILY_COST_CAP_USD=0.00001` in `.env` and restart the server,
 then send a chat message. Expected: the reply is the static cost-cap message ("I'm momentarily
@@ -128,4 +130,20 @@ and navigate to your project. Confirm:
 
 ---
 
-All eight checks passing = system is production-ready.
+## 9. (Optional) DeepEval faithfulness gate
+
+Only if the optional ML extra is installed (`pip install -r backend/requirements-ml.txt`) and a
+judge key is set:
+
+```bash
+export OPENAI_API_KEY=...                  # judge model
+pytest backend/tests/test_faithfulness_eval.py -v
+```
+
+Expected: each grounded case scores ≥ 0.7 faithfulness. Without the dep or key, the module skips
+(it never blocks the default suite). This is the deeper, judge-based complement to step 6's
+keyword/routing eval.
+
+---
+
+All eight core checks passing = system is production-ready. Step 9 is an optional deeper gate.
