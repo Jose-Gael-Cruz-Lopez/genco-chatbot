@@ -130,10 +130,18 @@ schema migration + full re-ingest; this is noted in the handoff doc.
 **Greeting:** "How can we support your sustainability journey?" with three options:
 Buy Sheets · Buy Refill Stations · Question for the team.
 
+**Store URLs (must not be confused):**
+- **Home-delivery product page** (the "Buy Sheets" target): `https://generationconscious.co/product/laundry-detergent-sheets/`
+  — where buyers pick variant (sheet count, scent, one-time vs. subscription) and add to cart. Send the
+  home-delivery flow **here**, not to `/checkout/` (an empty cart without a chosen variant).
+- **Shop (all products):** `https://generationconscious.co/shop/` — general store, optional "browse everything" fallback only.
+- **Location-Specific Refill Subscription:** `https://generationconscious.co/product/location-subscription/`
+  — the gated campus/building refill product. **Do NOT** use for home delivery; the refill-station path
+  stays lead capture (email + Pipedrive), not a direct link.
+
 **Flows:**
-- **Home delivery:** guide to online store / checkout. **The real store/product URL must be supplied**
-  (placeholder `STORE_URL` in the KB until provided — the bot links to it instead of deflecting). Without
-  it the bot cannot actually send buyers to purchase.
+- **Home delivery:** guide the user to the detergent-sheets product page
+  `https://generationconscious.co/product/laundry-detergent-sheets/` to choose options and buy.
 - **Wholesale:** collect Name, Email, Phone, Organization, Estimated total sheet purchase → lead to `Info@GenerationConscious.co` (or email/text (516) 619-6174).
 - **Refill stations:** collect Name, Email, Phone, Organization, Total Number of Laundry Rooms and Students (Tenants) → lead.
 - **Learn more:** Lifecycle Assessment (Drive link), Workforce Development Case Study (email/text with contact info), Mission (redirect to website), Refill Station example (Instagram link).
