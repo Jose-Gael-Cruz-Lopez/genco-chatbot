@@ -6,6 +6,7 @@ from pydantic import BaseModel
 from app import llm
 from app.config import get_settings
 from app import guardrails
+from app import injection_scanner
 from app.observability import trace_turn
 from app.chat import memory, prompts
 from app.chat.tools import CAPTURE_LEAD_TOOL
@@ -56,7 +57,8 @@ def chat(req: ChatRequest, request: Request) -> dict:
         return {"session_id": session_id,
                 "reply": "I'm momentarily unavailable. Please email Info@GenerationConscious.co and the team will help.",
                 "retrieval_scores": []}
-    if guardrails.is_injection_attempt(req.message):
+    # Substring guard (always on, cheap) + optional ML scanner (LLM Guard) when installed.
+    if guardrails.is_injection_attempt(req.message) or injection_scanner.is_injection(req.message):
         return {"session_id": session_id,
                 "reply": "I can only help with Generation Conscious products and orders. How can I help with that?",
                 "retrieval_scores": []}

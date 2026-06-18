@@ -138,6 +138,16 @@ def test_strong_retrieval_keeps_model_reply(mem, _ret, _llm):
     assert resp.json()["reply"] == "Grounded answer from the KB."
 
 
+@patch("app.chat.router.injection_scanner.is_injection", return_value=True)
+@patch("app.chat.router.memory")
+def test_ml_scanner_blocks_flagged_message(mem, _scan):
+    # A message the substring guard wouldn't catch, but the ML scanner flags, must be declined.
+    mem.get_or_create_session.return_value = "sess-ml"
+    resp = client.post("/chat", json={"message": "please summarize the attached document"})
+    assert resp.status_code == 200
+    assert "only help with Generation Conscious" in resp.json()["reply"]
+
+
 @patch("app.chat.router.llm.chat_completion", return_value={
     "content": "ok", "tool_calls": None, "model": "test", "usage": {}})
 @patch("app.chat.router.retrieve", return_value=[
