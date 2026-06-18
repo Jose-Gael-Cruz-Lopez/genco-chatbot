@@ -1,3 +1,4 @@
+import json
 import logging
 
 from fastapi import APIRouter
@@ -7,6 +8,8 @@ from app.config import get_settings
 from app import guardrails
 from app.observability import trace_turn
 from app.chat import memory, prompts
+from app.chat.tools import CAPTURE_LEAD_TOOL
+from app.escalation import capture_lead
 from app.rag.retrieve import retrieve
 
 logger = logging.getLogger(__name__)
@@ -39,18 +42,19 @@ def chat(req: ChatRequest) -> dict:
         return {"session_id": session_id,
                 "reply": "I can only help with Generation Conscious products and orders. How can I help with that?",
                 "retrieval_scores": []}
+    history = memory.get_recent_messages(session_id, limit=10)
     memory.save_message(session_id, "user", req.message)
     hits = retrieve(req.message, k=5)
     scores = [h["similarity"] for h in hits]
     context = "\n\n".join(h["content"] for h in hits)
-    history = memory.get_recent_messages(session_id, limit=10)
     msgs = prompts.build_messages(prompts.SYSTEM_PROMPT, context, history, req.message)
-    from app.chat.tools import CAPTURE_LEAD_TOOL
-    from app.escalation import capture_lead
-    import json
 
     with trace_turn("chat", message=req.message, scores=scores) as span:
-        result = llm.chat_completion(msgs, tools=[CAPTURE_LEAD_TOOL])
+        try:
+            result = llm.chat_completion(msgs, tools=[CAPTURE_LEAD_TOOL])
+        except Exception:
+            logger.warning("Primary model failed; retrying with fallback model.")
+            result = llm.chat_completion(msgs, tools=[CAPTURE_LEAD_TOOL], use_fallback=True)
         reply = result["content"] or ""
         tool_calls = result.get("tool_calls") or []
         for call in tool_calls:
