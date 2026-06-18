@@ -32,6 +32,9 @@ _ESCALATION_REPLY = (
 
 def _client_ip(request: Request) -> str:
     # On Render (and most proxies) the real client is the first hop in X-Forwarded-For.
+    # Caveat: the leftmost hop is client-spoofable if the proxy appends rather than replaces, so a
+    # determined abuser can still rotate the per-minute limit — the daily cost cap is the real
+    # backstop. Good enough to stop casual hammering.
     xff = request.headers.get("x-forwarded-for", "")
     if xff:
         return xff.split(",")[0].strip()

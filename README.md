@@ -321,10 +321,21 @@ remains the active defense — the app runs unchanged. To enable it in productio
 `requirements-ml.txt` to the image build and redeploy. Only the `PromptInjection` scanner is
 enabled (latency scales with scanner count).
 
+> **Sizing:** enabling this loads `torch` + a DeBERTa model into memory. A 512 MB instance (e.g.
+> Render's smallest) will **OOM** — size the instance to **~1–2 GB** before turning it on. While
+> it's off (the default), the substring guard has no such requirement.
+
 ### Faithfulness CI gate (DeepEval)
 
-`backend/tests/test_faithfulness_eval.py` uses an LLM judge to score whether answers are *faithful*
-to the retrieved KB context (catching hallucination that `run_eval.py`'s keyword routing can't).
+`backend/tests/test_faithfulness_eval.py` uses an LLM judge (`FaithfulnessMetric`) to score whether
+an answer is *faithful* to its retrieved KB context.
+
+**Scope — read this honestly:** the committed cases are **fixed answer/context pairs**, so this is a
+**metric-wiring + drift-regression** gate (it proves the faithfulness check works and catches
+regressions in representative answers), **not** proof that the live bot is faithful. Verifying the
+live bot would mean running real user queries through `retrieve → generate` and judging *those*
+outputs — a separate, live-key step (a natural extension once Supabase/OpenRouter keys are wired).
+
 It self-skips unless DeepEval is installed **and** a judge key is set, so it gates CI only where
 those are present:
 
