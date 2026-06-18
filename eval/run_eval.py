@@ -9,12 +9,14 @@ def classify(reply: str, scores: list) -> str:
     r = reply.lower()
     if "generationconscious.co/product" in r:
         return "redirect_to_store"
-    if any(w in r for w in ("name", "email", "phone", "organization")):
-        return "collect_lead_fields"
+    # Check escalate/decline BEFORE collect_lead_fields so that escalate replies
+    # containing "email Info@..." or "connect you" are not misclassified as lead collection.
     if "email info@generationconscious.co" in r or "connect you" in r:
         return "escalate"
     if "only help with" in r or "i can only" in r:
         return "decline"
+    if any(w in r for w in ("name", "email", "phone", "organization")):
+        return "collect_lead_fields"
     return "answer_from_kb"
 
 
