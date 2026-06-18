@@ -7,9 +7,14 @@ in `.env` are filled in and the backend is reachable.
 
 ## 1. Apply the database schema
 
-Open the Supabase SQL editor for your project and run the contents of `backend/schema.sql`.
-Confirm that the tables `kb_documents`, `leads`, `chat_messages`, and the `match_documents`
-function all appear in the Table Editor.
+Open the Supabase SQL editor for your project and run the contents of
+`backend/app/rag/schema.sql`. Confirm that the tables `kb_documents`, `leads`, `chat_messages`,
+and the `match_documents` function all appear in the Table Editor.
+
+The KB vector index is **HNSW** (`using hnsw (embedding vector_cosine_ops)`), chosen over ivfflat
+because the KB is tiny (~20-40 chunks): ivfflat with many lists leaves most lists empty and a
+single-probe query returns little, which would show up here as artificially low similarity. HNSW
+needs no list tuning and no post-insert training.
 
 ---
 

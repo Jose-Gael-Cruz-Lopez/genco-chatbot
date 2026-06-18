@@ -97,21 +97,25 @@ dashboard as service environment variables.
 ## Deploying to Render
 
 1. Push this repository to GitHub (or GitLab/Bitbucket).
-2. In the [Render dashboard](https://render.com), create a new **Web Service**.
-3. Select **Docker** as the environment and point it at `backend/Dockerfile`
-   (or use the `backend/render.yaml` file — Render can auto-detect it).
+2. In the [Render dashboard](https://render.com), create a new **Web Service**, or let Render
+   auto-detect the **`render.yaml` Blueprint at the repo root**.
+3. The Blueprint builds `./backend/Dockerfile` with the **repository root as the build context**
+   (`dockerContext: .`), so the widget is bundled into the image (see "Serving the widget" below).
 4. Set all environment variables from the table above in the Render **Environment** tab.
 5. Render will build the image and deploy; the `/health` endpoint is used as the health check.
 
 **Alternatives:** Railway (`railway.app`) and Fly.io (`fly.toml`) work the same way — any host
-that can run the Docker image and inject env vars with a `/health` check will work.
+that can run the Docker image (built from the repo root) and inject env vars with a `/health`
+check will work.
 
 ### Docker image (for local testing)
 
+The build context is the **repository root** (not `backend/`) so `widget/dist/` is bundled:
+
 ```bash
-cd backend
-docker build -t genco-chatbot .
-docker run -p 8000:8000 --env-file ../.env genco-chatbot
+# from the repo root
+docker build -f backend/Dockerfile -t genco-chatbot .
+docker run -p 8000:8000 --env-file .env genco-chatbot
 ```
 
 ---
@@ -135,66 +139,43 @@ alternative if you want to decouple widget deploys from backend deploys).
 
 ### Serving the widget in production
 
-**The gap:** `backend/app/main.py` mounts `widget/dist/` via a path resolved relative to the
-repo root (`Path(__file__).resolve().parent.parent.parent / "widget" / "dist"`). In local
-development this works because both `backend/` and `widget/dist/` are present on disk. In
-production, however, the Docker image is built with `backend/` as the build context
-(`render.yaml`: `dockerContext: .`, evaluated from the `backend/` directory). The Dockerfile's
-`COPY . .` therefore copies only the contents of `backend/` — `widget/dist/` is never included.
-At startup the `if _widget_dir.exists()` guard silently skips the mount, and
-`GET /widget/widget.js` returns **404** even though the embed snippet points there.
+**This is now handled by default (Option 1 below).** The Dockerfile builds from the repository
+root and bundles `widget/dist/` into the image at `/widget/dist`, which is exactly where
+`backend/app/main.py` resolves the `/widget` mount to
+(`Path(__file__).resolve().parent.parent.parent / "widget" / "dist"`). So a default deploy
+serves `GET /widget/widget.js` and the embed snippet works out of the box. (Historically the
+image was built with `backend/` as the context, which excluded `widget/dist/` and caused a
+silent 404 — that's been fixed.)
 
-Choose one of the two remedies below before going live:
-
----
-
-**Option 1 — Bundle the widget into the backend Docker image**
-
-Build the Docker image from the **repository root** so both `backend/` and `widget/dist/` are
-available to the build context.
-
-1. In `backend/render.yaml`, change `dockerContext` from `.` to `..` (the repo root):
-
-   ```yaml
-   dockerfilePath: ./backend/Dockerfile
-   dockerContext: ..
-   ```
-
-2. Update `backend/Dockerfile` so its `COPY` paths account for the new context root:
-
-   ```dockerfile
-   FROM python:3.11-slim
-   WORKDIR /app
-   # Copy and install Python dependencies
-   COPY backend/requirements.txt .
-   RUN pip install --no-cache-dir -r requirements.txt
-   # Copy backend application code
-   COPY backend/ .
-   # Copy pre-built widget so the /widget static mount is satisfied
-   COPY widget/dist/ widget/dist/
-   EXPOSE 8000
-   HEALTHCHECK CMD python -c "import urllib.request;urllib.request.urlopen('http://localhost:8000/health')"
-   CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
-   ```
-
-   The `COPY widget/dist/ widget/dist/` line places the built widget at
-   `/app/widget/dist/` inside the container, which is exactly where `main.py`'s
-   three-`parent`-level path resolves to (`/app` is the `WORKDIR`).
-
-3. If you build the image manually (e.g. for local testing), run from the repo root:
-
-   ```bash
-   # from repo root, not backend/
-   docker build -f backend/Dockerfile -t genco-chatbot .
-   docker run -p 8000:8000 --env-file .env genco-chatbot
-   ```
-
-**Important:** run `npm run build` (or the equivalent build step) inside `widget/` to produce
-`widget/dist/widget.js` **before** running the Docker build, otherwise the `COPY` will fail.
+Verify after deploy with the LAUNCH_CHECKLIST `curl -I` check. If you'd rather decouple the
+widget from the backend, use the CDN option instead.
 
 ---
 
-**Option 2 — Host widget.js on a CDN / static host (simpler)**
+**Option 1 — Bundle the widget into the backend Docker image (default, already configured)**
+
+`render.yaml` (repo root) sets `dockerfilePath: ./backend/Dockerfile` and `dockerContext: .`,
+and `backend/Dockerfile` does:
+
+```dockerfile
+COPY backend/ /app
+COPY widget/dist /widget/dist
+```
+
+Build manually from the repo root for local testing:
+
+```bash
+# from repo root, not backend/
+docker build -f backend/Dockerfile -t genco-chatbot .
+docker run -p 8000:8000 --env-file .env genco-chatbot
+```
+
+`widget/dist/widget.js` is committed to the repo (it's a single hand-authored file, no build
+step), so the `COPY` always has something to copy.
+
+---
+
+**Option 2 — Host widget.js on a CDN / static host (alternative)**
 
 Upload `widget/dist/widget.js` to any static hosting service (e.g. Cloudflare Pages, Netlify,
 AWS S3 + CloudFront, GitHub Pages). The backend serves only the API; only the `src` in the
@@ -328,11 +309,11 @@ genco-chatbot/
 │   ├── eval/                # run_eval.py harness
 │   ├── schema.sql           # Supabase schema (apply once)
 │   ├── requirements.txt
-│   ├── Dockerfile
-│   └── render.yaml
+│   └── Dockerfile           # built from repo root (bundles widget/dist)
 ├── widget/
 │   └── dist/
-│       └── widget.js        # compiled embed widget
+│       └── widget.js        # embed widget (single hand-authored file)
+├── render.yaml              # Render Blueprint (repo root; dockerContext: .)
 ├── .env.example
 ├── VERIFICATION.md          # deferred live-key checks
 ├── LAUNCH_CHECKLIST.md      # pre-launch gate checklist

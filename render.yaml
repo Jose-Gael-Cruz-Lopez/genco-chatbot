@@ -1,0 +1,48 @@
+# Render Blueprint — lives at the repo root. Build context is the repo root so the Dockerfile
+# can bundle widget/dist alongside the backend.
+services:
+  - type: web
+    name: genco-chatbot
+    env: docker
+    dockerfilePath: ./backend/Dockerfile
+    dockerContext: .
+    healthCheckPath: /health
+    envVars:
+      - key: OPENROUTER_API_KEY
+        sync: false
+      - key: OPENROUTER_MODEL
+        sync: false
+      - key: OPENROUTER_MODEL_FALLBACK
+        sync: false
+      - key: EMBEDDING_API_KEY
+        sync: false
+      - key: EMBEDDING_MODEL
+        sync: false
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_SERVICE_KEY
+        sync: false
+      - key: LANGFUSE_PUBLIC_KEY
+        sync: false
+      - key: LANGFUSE_SECRET_KEY
+        sync: false
+      - key: LANGFUSE_HOST
+        sync: false
+      - key: RESEND_API_KEY
+        sync: false
+      - key: FROM_EMAIL
+        sync: false
+      - key: ESCALATION_EMAIL
+        sync: false
+      - key: PIPEDRIVE_API_TOKEN
+        sync: false
+      - key: PIPEDRIVE_DOMAIN
+        sync: false
+      - key: ALLOWED_ORIGINS
+        sync: false
+      - key: RATE_LIMIT_PER_MINUTE
+        sync: false
+      - key: DAILY_COST_CAP_USD
+        sync: false
+# Alternatives: Railway (railway.app) and Fly.io (fly.toml) work the same way —
+# any host that runs the Docker image (built from the repo root) and injects env vars + a /health check.
