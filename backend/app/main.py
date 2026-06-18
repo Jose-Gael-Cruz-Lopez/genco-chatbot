@@ -18,3 +18,7 @@ app.add_middleware(
 @app.get("/health")
 def health() -> dict[str, str]:
     return {"status": "ok"}
+
+
+from app.chat.router import router as chat_router
+app.include_router(chat_router)
