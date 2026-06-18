@@ -19,11 +19,6 @@ def check_on_topic(text: str) -> bool:
     return True
 
 
-def consent_note() -> str:
-    return ("Before we continue — I'll only use the contact details you share to connect you "
-            "with our team. ")
-
-
 # NOTE: in-memory, single-instance only — swap in Redis (or similar shared store) for multi-instance deployments.
 class RateLimiter:
     def __init__(self, per_minute: int):
