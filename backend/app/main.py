@@ -1,5 +1,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
+from pathlib import Path
 
 from app.config import get_settings
 
@@ -22,3 +24,7 @@ def health() -> dict[str, str]:
 
 from app.chat.router import router as chat_router
 app.include_router(chat_router)
+
+_widget_dir = Path(__file__).resolve().parent.parent.parent / "widget" / "dist"
+if _widget_dir.exists():
+    app.mount("/widget", StaticFiles(directory=str(_widget_dir)), name="widget")
