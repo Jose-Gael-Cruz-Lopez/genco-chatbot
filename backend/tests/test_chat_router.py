@@ -2,6 +2,8 @@ import json
 from unittest.mock import patch, MagicMock
 from fastapi.testclient import TestClient
 from app.main import app
+from app.chat import router as chat_router
+from app import guardrails
 
 client = TestClient(app)
 
@@ -101,3 +103,58 @@ def test_lead_capture_validation_reprompt(mem, _ret, _llm, mock_capture):
     # Reply must contain the re-prompt text with the missing field info
     assert "missing required field: estimated_sheets" in body["reply"]
     assert "I still need a bit more info" in body["reply"]
+
+
+@patch("app.chat.router.llm.chat_completion", return_value={
+    "content": "Here is an off-topic answer the model made up.",
+    "tool_calls": None, "model": "test", "usage": {}})
+@patch("app.chat.router.retrieve", return_value=[
+    {"content": "weakly related", "metadata": {}, "similarity": 0.1}])
+@patch("app.chat.router.memory")
+def test_weak_retrieval_forces_escalation(mem, _ret, _llm):
+    # Top similarity 0.1 is below LOW_SIMILARITY (0.25) and there is no lead tool-call,
+    # so the grounding safety net must override the model's reply with the connect-to-team message.
+    mem.get_or_create_session.return_value = "sess-esc"
+    mem.get_recent_messages.return_value = []
+    resp = client.post("/chat", json={"message": "what's the capital of France?"})
+    assert resp.status_code == 200
+    body = resp.json()
+    assert set(body.keys()) == {"session_id", "reply", "retrieval_scores"}
+    assert body["reply"] == chat_router._ESCALATION_REPLY
+    assert "Here is an off-topic answer" not in body["reply"]
+
+
+@patch("app.chat.router.llm.chat_completion", return_value={
+    "content": "Grounded answer from the KB.",
+    "tool_calls": None, "model": "test", "usage": {}})
+@patch("app.chat.router.retrieve", return_value=[
+    {"content": "strongly related", "metadata": {}, "similarity": 0.82}])
+@patch("app.chat.router.memory")
+def test_strong_retrieval_keeps_model_reply(mem, _ret, _llm):
+    # Good retrieval (0.82) must NOT trigger escalation — the model's grounded reply stands.
+    mem.get_or_create_session.return_value = "sess-ok"
+    mem.get_recent_messages.return_value = []
+    resp = client.post("/chat", json={"message": "how do I buy sheets"})
+    assert resp.json()["reply"] == "Grounded answer from the KB."
+
+
+@patch("app.chat.router.llm.chat_completion", return_value={
+    "content": "ok", "tool_calls": None, "model": "test", "usage": {}})
+@patch("app.chat.router.retrieve", return_value=[
+    {"content": "x", "metadata": {}, "similarity": 0.8}])
+@patch("app.chat.router.memory")
+def test_rate_limit_keyed_on_ip_not_session(mem, _ret, _llm):
+    # Same client IP, rotating/omitting session_id, must still hit the per-IP limit.
+    mem.get_or_create_session.side_effect = lambda s: s or "new-session"
+    mem.get_recent_messages.return_value = []
+    headers = {"X-Forwarded-For": "9.9.9.9"}
+    with patch.object(chat_router, "_rate_limiter", guardrails.RateLimiter(per_minute=1)):
+        first = client.post("/chat", json={"message": "hi"}, headers=headers)
+        # different (omitted) session, SAME ip -> still limited
+        second = client.post("/chat", json={"message": "hi"}, headers=headers)
+        # different ip -> allowed
+        other = client.post("/chat", json={"message": "hi"},
+                            headers={"X-Forwarded-For": "8.8.8.8"})
+    assert "give me a moment" in second.json()["reply"]
+    assert "give me a moment" not in first.json()["reply"]
+    assert "give me a moment" not in other.json()["reply"]

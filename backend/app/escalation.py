@@ -9,9 +9,9 @@ LOW_SIMILARITY = 0.25
 HIGH_RISK_KEYWORDS = ("refund", "complaint", "lawyer", "press", "urgent")
 
 
-# Retained helper for a future server-side escalation trigger; intentionally NOT wired into the
-# current chat flow — escalation is delegated to the LLM capture_lead tool-call and the
-# system-prompt "offer to connect with the team" rule.
+# Server-side grounding safety net, wired into the chat flow (chat/router.py): when the top
+# retrieval similarity is below LOW_SIMILARITY (or a high-risk keyword appears, or the model
+# signals it lacks info), the turn is routed to the team instead of risking an ungrounded answer.
 def should_escalate(retrieval_scores: list[float], model_signal: bool = False,
                     text: str = "") -> bool:
     top = max(retrieval_scores) if retrieval_scores else 0.0
