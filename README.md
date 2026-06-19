@@ -22,11 +22,68 @@ Widget (vanilla JS, single file) ──POST /chat──> FastAPI backend
 
 ---
 
+## Go-Live Runbook
+
+The build is done; this is the runbook to take it live, roughly in order. The **critical path is
+1 → 2 → 4 → 5**; branding (3) and the optional gate (6) slot in around them. The most likely place
+to stall is the company-dependent items in step 1 — **fire those off first.**
+
+### 1. Get the keys (the real gate)
+
+Six services must be wired into `.env`: **Supabase** (URL + `service_role` key), **OpenRouter**,
+**OpenAI** (embeddings — a *separate* key), **LangFuse** (public + secret), **Resend**, and
+**Pipedrive** (token + subdomain). Three are the company's to provide — loop Greg in now:
+
+- OpenRouter / OpenAI billing (the scope puts LLM costs on the company),
+- the Pipedrive API token,
+- Resend's sending domain.
+
+**Start Resend first:** verifying `generationconscious.co` as a sending domain needs DNS records and
+can take a while to propagate. Until it's done, lead-notification emails silently fail.
+
+### 2. Stand it up locally and run all 8 VERIFICATION.md checks
+
+Fill `.env`, paste `backend/app/rag/schema.sql` into the Supabase SQL editor, run
+`python -m app.rag.ingest`, confirm `/health`. Then work the eight checks in `VERIFICATION.md`. Two
+to watch:
+
+- **Check 5** — a real wholesale **and** refill lead landing in Supabase **and** the inbox **and**
+  Pipedrive. This proves the actual business goal; don't wave it through.
+- **Check 3** — eyeball the printed similarity scores against the `0.25` escalation threshold.
+
+### 3. Brand the widget
+
+`widget/dist/widget.js` still has two placeholders (`PRIMARY` color and `LOGO` URL). Get GC's real
+brand color and a logo URL from Greg, drop them in, and re-open `widget/test.html` to confirm it
+renders correctly.
+
+### 4. Deploy to Render
+
+Create the service from the **root `render.yaml`** blueprint, set every env var from the
+[Environment Variables](#environment-variables) table in the Render dashboard (all `sync: false`, so
+you paste them there), let it build, then confirm `/health` is green and
+`curl -I https://YOUR-HOST/widget/widget.js` returns **200**.
+
+### 5. Embed and lock down
+
+You'll need temporary WP admin from Greg. Paste the embed snippet into WordPress (header/footer
+plugin or Elementor block) with `data-backend-url` pointing at the Render host. In the Render env,
+set `ALLOWED_ORIGINS` to **just** `https://generationconscious.co` (drop localhost). Then re-run a
+lead end-to-end against production and do the **mobile + desktop QA** pass.
+
+### 6. Optional, after it's live
+
+- Set the CI secret (`gh secret set OPENAI_API_KEY`) to activate the faithfulness gate.
+- To run the ML injection scanner in prod, add `requirements-ml.txt` to the image on an instance
+  sized **~1–2 GB** (see [Optional ML Enhancements](#optional-ml-enhancements)).
+
+---
+
 ## Prerequisites
 
 - Python 3.11+
 - pip
-- A Supabase project with the schema applied (see `backend/schema.sql`)
+- A Supabase project with the schema applied (see `backend/app/rag/schema.sql`)
 
 ---
 
