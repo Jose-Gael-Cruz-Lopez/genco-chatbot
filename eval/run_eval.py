@@ -29,7 +29,6 @@ import time
 import urllib.request
 from pathlib import Path
 
-BACKEND = sys.argv[1] if len(sys.argv) > 1 else "http://localhost:8000"
 CASES = Path(__file__).parent / "test_set.jsonl"
 
 
