@@ -29,7 +29,6 @@
     "background:#fff;border-radius:14px;box-shadow:0 10px 40px rgba(0,0,0,.25);display:none;flex-direction:column;overflow:hidden;z-index:2147483000;font-family:system-ui,sans-serif}" +
     ".gc-panel.open{display:flex}" +
     ".gc-head{background:" + PRIMARY + ";color:#fff;padding:14px 16px;display:flex;align-items:center;gap:10px;font-weight:600}" +
-    ".gc-head img{height:24px}.gc-close{margin-left:auto;background:none;border:0;color:#fff;font-size:20px;cursor:pointer}" +
     ".gc-msgs{flex:1;overflow-y:auto;padding:14px;display:flex;flex-direction:column;gap:10px}" +
     ".gc-b{max-width:80%;padding:9px 12px;border-radius:12px;line-height:1.4;white-space:pre-wrap;word-wrap:break-word}" +
     ".gc-user{align-self:flex-end;background:" + PRIMARY + ";color:#fff}" +
