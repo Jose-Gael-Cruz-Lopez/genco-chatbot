@@ -161,6 +161,11 @@ def chat(req: ChatRequest, request: Request) -> dict:
         # Server-side grounding safety net: if the model isn't capturing a lead and retrieval is too
         # weak to ground an answer (top similarity below threshold, or a high-risk keyword), route to
         # the team rather than risk an ungrounded reply — regardless of what the model produced.
+        # Suppressed mid-lead-flow: field answers ("John Smith, john@acme.com", "500 sheets")
+        # naturally score low against the KB and must not derail the capture flow.
+        if not tool_calls and should_escalate(
+                scores, text=req.message,
+                lead_flow=is_lead_flow_turn(history, current_message=req.message)):
             reply = _ESCALATION_REPLY
         span.update(model=result["model"], usage=result["usage"], reply=reply)
         _cost.record(result["usage"], result["model"])
