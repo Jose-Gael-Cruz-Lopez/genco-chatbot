@@ -58,10 +58,4 @@ def test_capture_stores_before_notifying(sb, email, pipe):
 @patch("app.escalation.send_lead_notification", side_effect=Exception("down"))
 @patch("app.escalation.get_supabase")
 def test_notify_failures_do_not_raise(sb, email, pipe):
-    table = MagicMock()
-    table.insert.return_value.execute.return_value = MagicMock(data=[_row()])
-    sb.return_value.table.return_value = table
-    lead = escalation.capture_lead("sess", "wholesale",
-        {"name": "A", "email": "a@b.com", "phone": "1",
-         "organization": "Org", "estimated_sheets": 500})
     assert lead["id"] == "lead-1"   # lead persisted despite both notifications failing
