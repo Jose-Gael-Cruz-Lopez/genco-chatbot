@@ -66,6 +66,8 @@ def ingest_all() -> int:
     rows = list(rows_by_hash.values())
     sb = get_supabase()
     sb.table("kb_documents").upsert(rows, on_conflict="content_hash").execute()
+    # Only now remove rows that are no longer part of the KB.
+    sb.table("kb_documents").delete().not_.in_(
     return len(rows)
 
 
