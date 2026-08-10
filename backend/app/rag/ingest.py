@@ -52,6 +52,19 @@ def ingest_all() -> int:
         return 0
     # Embed BEFORE any database write — if this raises, the old KB keeps serving.
     vectors = embed_batch([c["content"] for c in all_chunks])
+    # Dedupe by content_hash: duplicate hashes in one upsert statement fail with
+    # Postgres "ON CONFLICT DO UPDATE command cannot affect row a second time".
+    rows_by_hash: dict[str, dict] = {}
+    for chunk, vector in zip(all_chunks, vectors):
+        content_hash = hashlib.sha256(chunk["content"].encode()).hexdigest()
+        rows_by_hash.setdefault(content_hash, {
+            "content": chunk["content"],
+            "content_hash": content_hash,
+            "embedding": vector,
+            "metadata": chunk["metadata"],
+        })
+    rows = list(rows_by_hash.values())
+    sb = get_supabase()
     sb.table("kb_documents").upsert(rows, on_conflict="content_hash").execute()
     return len(rows)
 
