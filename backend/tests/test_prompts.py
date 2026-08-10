@@ -24,6 +24,21 @@ def test_system_prompt_pins_privacy_consent_rule():
     # details has to carry the exact consent disclosure from guardrails.consent_note().
     p = prompts.SYSTEM_PROMPT
     assert "PRIVACY" in p
+    assert guardrails.consent_note() in p
+
+
+def test_system_prompt_lists_every_lead_intent_and_required_field():
+    # The LEAD FLOWS section is generated from REQUIRED_FIELDS/FIELD_LABELS; pin that every
+    # intent and every human field label actually lands in the prompt the model sees.
+    from app.chat.tools import FIELD_LABELS, REQUIRED_FIELDS
+    p = prompts.SYSTEM_PROMPT
+    assert "LEAD FLOWS" in p
+    for intent, fields in REQUIRED_FIELDS.items():
+        assert intent.replace("_", " ") in p
+        for f in fields:
+            assert FIELD_LABELS[f] in p
+
+
 def test_build_messages_orders_system_context_history_user():
     msgs = prompts.build_messages("SYS", "CONTEXT", [{"role": "user", "content": "hi"}], "now")
     assert msgs[0]["role"] == "system"
