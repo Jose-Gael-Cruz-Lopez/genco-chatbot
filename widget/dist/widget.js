@@ -152,6 +152,9 @@
     if (!greeted) { greeted = true; if (sessionId) loadHistory(); else greet(); }
     input.focus();
   }
+  function close() {
+    panel.classList.remove("open");
+    unlockScroll();
   launch.onclick = open;
   panel.querySelector(".gc-close").onclick = function () { panel.classList.remove("open"); };
   panel.querySelector(".gc-input button").onclick = function () { send(input.value); };
