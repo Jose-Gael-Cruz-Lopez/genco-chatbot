@@ -10,7 +10,6 @@ from app import injection_scanner
 from app.observability import trace_turn
 from app.chat import memory, prompts
 from app.chat.tools import CAPTURE_LEAD_TOOL
-from app.escalation import capture_lead, should_escalate
 from app.rag.retrieve import retrieve
 
 logger = logging.getLogger(__name__)
