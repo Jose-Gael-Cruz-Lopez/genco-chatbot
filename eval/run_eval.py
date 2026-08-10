@@ -87,6 +87,9 @@ def classify(reply: str, scores: list) -> str:
     return "answer_from_kb"
 
 
+def load_cases() -> list[dict]:
+    cases: list[dict] = []
+    for n, line in enumerate(CASES.read_text().splitlines(), start=1):
         if not line.strip():
             continue
         case = json.loads(line); total += 1
