@@ -3,6 +3,9 @@ from pathlib import Path
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+# Anchor the env file to backend/.env (this file lives at backend/app/config.py) so
+# settings load identically from any CWD — repo root, backend/, or elsewhere. A bare
+
 
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
