@@ -3,5 +3,113 @@
 <title>Genco Widget Test</title></head>
 <body style="font-family:system-ui;padding:40px;max-width:680px">
   <h1>Generation Conscious — widget test page</h1>
+
+  <h2>Three ways to run</h2>
+  <ol>
+    <li>
+      <strong>Offline stub, no server (zero keys):</strong> open this file with
+      <code>?stub=1</code> appended, e.g.
+      <code>file:///…/widget/test.html?stub=1</code>. An inline fetch mock in this
+      page answers <code>POST /chat</code> and <code>GET /history</code> with canned
+      JSON, so the full conversation UI — greeting, quick replies, typing indicator,
+      reply bubbles, and reload-rehydrate (history survives reload within the tab
+      via <code>sessionStorage</code>) — is testable completely offline.
+    </li>
+    <li>
+      <strong>Offline stub server:</strong> run
+      <code>python widget/stub_server.py</code> (stdlib only, default port 8000)
+      and open this file normally. Same canned endpoints, served over HTTP with
+      permissive CORS.
+    </li>
+    <li>
+      <strong>Real backend:</strong> start the FastAPI app at
+      <code>http://localhost:8000</code> (requires real keys in
+      <code>backend/.env</code>), then serve this page over HTTP from an allowed
+      CORS origin: <code>cd widget &amp;&amp; python -m http.server 5500</code> and
+      open <code>http://localhost:5500/test.html</code>. That origin is in the dev
+      <code>ALLOWED_ORIGINS</code> default; opening via <code>file://</code> sends a
+      null origin the real backend's CORS policy rejects.
+    </li>
+  </ol>
+
+  <p>
+    <strong>Stub-only test hooks</strong> (both stub modes): send the message
+    <code>fail</code> to get an HTTP 500 (the widget must show the friendly error
+    bubble), or <code>empty</code> to get a 200 with an empty reply (the widget
+    must fall back to the friendly error text instead of a blank bubble).
+    To restart the stubbed conversation, clear the tab's storage or use a new tab
+    (session id lives in <code>localStorage</code>, stub history in
+    <code>sessionStorage</code>).
+  </p>
+
+  <!-- Inline offline stub: must come BEFORE the widget script so fetch is
+       already mocked when the widget loads. Active only with ?stub=1. -->
+  <script>
+  (function () {
+    if (!/[?&]stub=1(?:&|$)/.test(location.search)) return;
+    var HKEY = "genco_stub_history";
+    function loadHist() {
+      try { return JSON.parse(sessionStorage.getItem(HKEY) || "[]"); } catch (e) { return []; }
+    }
+    function saveHist(h) {
+      try { sessionStorage.setItem(HKEY, JSON.stringify(h)); } catch (e) { /* no-op */ }
+    }
+    function jsonResponse(body, status) {
+      return new Response(JSON.stringify(body), {
+        status: status || 200, headers: { "Content-Type": "application/json" }
+      });
+    }
+    function delay(ms) { return new Promise(function (res) { setTimeout(res, ms); }); }
+    function replyFor(message) {
+      var m = message.trim().toLowerCase();
+      if (m === "buy sheets") {
+        return "You can pick your sheet count, scent, and one-time vs. subscription on our product page: https://generationconscious.co/product/laundry-detergent-sheets/";
+      }
+      if (m === "buy refill stations") {
+        return "Happy to connect you with the team! Could you share your name, email, phone, organization, number of laundry rooms, and number of students (tenants)?";
+      }
+      if (m === "question for the team") {
+        return "Of course — what's your question? I'll pass it to the team along with your name and email (they usually reply within 15 minutes).";
+      }
+      if (m === "empty") return "";
+      return "(stubbed) Thanks — this canned reply proves the conversation UI works offline. You said: " + message;
+    }
+    var realFetch = window.fetch;
+    window.fetch = function (url, opts) {
+      var u = String(url);
+      opts = opts || {};
+      if (/\/chat(?:\?|$)/.test(u) && String(opts.method || "GET").toUpperCase() === "POST") {
+        var payload = {};
+        try { payload = JSON.parse(opts.body || "{}"); } catch (e) { /* keep {} */ }
+        var message = String(payload.message || "");
+        if (message.trim().toLowerCase() === "fail") {
+          return delay(400).then(function () {
+            return jsonResponse({ detail: "stubbed internal error" }, 500);
+          });
+        }
+        var sessionId = payload.session_id || "stub-session-1";
+        var reply = replyFor(message);
+        var now = new Date().toISOString();
+        var hist = loadHist();
+        hist.push({ role: "user", content: message, created_at: now });
+        if (reply) hist.push({ role: "assistant", content: reply, created_at: now });
+        saveHist(hist);
+        return delay(400).then(function () {
+          return jsonResponse({ session_id: sessionId, reply: reply, retrieval_scores: [0.91, 0.84, 0.42] });
+        });
+      }
+      if (/\/history(?:\?|$)/.test(u)) {
+        var q = u.split("?")[1] || "";
+        var match = q.match(/(?:^|&)session_id=([^&]*)/);
+        var sid = decodeURIComponent(match ? match[1] : "");
+        return delay(150).then(function () {
+          return jsonResponse({ session_id: sid || "stub-session-1", messages: loadHist() });
+        });
+      }
+      return realFetch.apply(window, arguments);
+    };
+    console.info("[genco stub] offline fetch mock active — POST /chat and GET /history are canned.");
+  })();
+  </script>
   <script src="./dist/widget.js" data-backend-url="http://localhost:8000"></script>
 </body></html>
