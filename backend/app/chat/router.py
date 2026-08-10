@@ -130,8 +130,6 @@ def chat(req: ChatRequest, request: Request) -> dict:
         reply = result["content"] or ""
         tool_calls = result.get("tool_calls") or []
         for call in tool_calls:
-            if call["function"]["name"] == "capture_lead":
-                args = json.loads(call["function"]["arguments"])
                 intent = args.pop("intent")
                 try:
                     capture_lead(session_id, intent, args)
