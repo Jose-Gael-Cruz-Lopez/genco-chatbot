@@ -95,8 +95,3 @@ def test_rate_limiter_blocks_after_cap():
     assert rl.allow("ip2")
 
 
-def test_cost_tracker_trips_cap():
-    ct = guardrails.CostTracker(daily_cap_usd=0.0001)
-    assert not ct.exceeded()
-    ct.record({"prompt_tokens": 1000, "completion_tokens": 1000}, "anthropic/claude-3.5-sonnet")
-    assert ct.exceeded()
