@@ -39,6 +39,7 @@ _RATES: dict[str, dict[str, float]] = {
 
 
 def is_injection_attempt(text: str) -> bool:
+    return _INJECTION_RE.search(text.lower()) is not None
 
 
 def check_on_topic(text: str) -> bool:
