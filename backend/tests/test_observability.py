@@ -59,3 +59,64 @@ def test_generation_records_model_usage_and_output():
                     output="hello",
                 )
     trace.generation.assert_called_once_with(
+        name="generate", input={"messages": [{"role": "user", "content": "hi"}]})
+    trace.generation.return_value.end.assert_called_once_with(
+        model="anthropic/claude-3.5-sonnet",
+        usage={"input": 10, "output": 5, "total": 15, "unit": "TOKENS"},
+        output="hello",
+    )
+
+
+def test_generation_ends_even_when_wrapped_call_raises():
+    # The observation must be closed (latency recorded) and the trace flushed
+    # even when the LLM call inside it blows up.
+    lf = MagicMock()
+    trace = lf.trace.return_value
+    with patch("app.observability.init_langfuse", return_value=lf):
+        with pytest.raises(RuntimeError):
+            with observability.trace_turn("chat") as span:
+                with span.generation("generate"):
+                    raise RuntimeError("openrouter down")
+    trace.generation.return_value.end.assert_called_once_with()
+    lf.flush.assert_called_once()
+
+
+def test_tag_sets_trace_tags():
+    lf = MagicMock()
+    trace = lf.trace.return_value
+    with patch("app.observability.init_langfuse", return_value=lf):
+        with observability.trace_turn("chat") as span:
+            span.tag("escalation")
+    trace.update.assert_called_with(tags=["escalation"])
+
+
+def test_event_emitted_on_trace():
+    lf = MagicMock()
+    trace = lf.trace.return_value
+    with patch("app.observability.init_langfuse", return_value=lf):
+        with observability.trace_turn("chat") as span:
+            span.event("respond", output="bye")
+    trace.event.assert_called_once_with(name="respond", output="bye")
+
+
+def test_update_merges_metadata_onto_trace():
+    lf = MagicMock()
+    trace = lf.trace.return_value
+    with patch("app.observability.init_langfuse", return_value=lf):
+        with observability.trace_turn("chat", message="hi") as span:
+            span.update(reply="ok", model="m")
+    trace.update.assert_called_once_with(
+        metadata={"message": "hi", "reply": "ok", "model": "m"})
+
+
+def test_usage_mapping_openrouter_to_langfuse():
+    # OpenRouter/OpenAI-style token counts map to the langfuse 2.x usage shape
+    # so the cost dashboard picks them up; empty/absent usage maps to None.
+    assert observability._to_langfuse_usage(
+        {"prompt_tokens": 10, "completion_tokens": 5}) == {
+        "input": 10, "output": 5, "total": 15, "unit": "TOKENS"}
+    assert observability._to_langfuse_usage(
+        {"prompt_tokens": 10, "completion_tokens": 5, "total_tokens": 20}) == {
+        "input": 10, "output": 5, "total": 20, "unit": "TOKENS"}
+    assert observability._to_langfuse_usage({}) is None
+    assert observability._to_langfuse_usage(None) is None
