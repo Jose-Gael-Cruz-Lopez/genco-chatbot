@@ -7,6 +7,8 @@ _client = OpenAI(api_key=_settings.EMBEDDING_API_KEY)
 
 # Must match `embedding vector(1536)` in app/rag/schema.sql. Switching embedding
 # models requires a schema migration + full re-ingest (see README).
+EMBEDDING_DIM = 1536
+
 
 @retry(stop=stop_after_attempt(3), wait=wait_exponential(min=1, max=10))
 def embed_batch(texts: list[str]) -> list[list[float]]:
