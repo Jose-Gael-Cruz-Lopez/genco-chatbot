@@ -119,6 +119,7 @@ class TurnTrace:
 def trace_turn(name: str, **metadata: Any) -> Iterator[TurnTrace]:
     lf = init_langfuse()
     trace = lf.trace(name=name, metadata=metadata) if lf else None
+    turn = TurnTrace(trace, dict(metadata))
     try:
         yield span
     finally:
