@@ -95,7 +95,6 @@ def chat(req: ChatRequest, request: Request) -> dict:
     history = memory.get_recent_messages(session_id, limit=10)
     memory.save_message(session_id, "user", req.message)
 
-    with trace_turn("chat", message=req.message, scores=scores) as span:
         try:
             result = llm.chat_completion(msgs, tools=[CAPTURE_LEAD_TOOL])
         except Exception:
