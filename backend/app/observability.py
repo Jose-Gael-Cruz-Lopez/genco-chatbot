@@ -12,6 +12,7 @@ observability must never break a chat turn.
 from collections.abc import Iterator
 from contextlib import contextmanager
 from typing import Any
+
 from app.config import get_settings
 
 _settings = get_settings()
