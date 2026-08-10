@@ -324,6 +324,15 @@ Open [cloud.langfuse.com](https://cloud.langfuse.com) and navigate to your proje
   fallback model. The fallback model (`OPENROUTER_MODEL_FALLBACK`) is invoked only when the
   primary model call fails after its internal retries. Adjust the cap in the Render environment
   variables.
+- **The cost tracker is in-memory and per-process** (`CostTracker` in `backend/app/guardrails.py`):
+  it resets to zero on every deploy, restart, or crash, and each uvicorn worker or extra instance
+  keeps its own independent accumulator — so the "daily" cap is per-process, not global, and
+  effectively multiplies by the worker/instance count. Pin the deploy to a single worker, or swap
+  in a shared store (Redis, or a Supabase row keyed by UTC date) before scaling out.
+- **Spend is an estimate from hardcoded prices**: the tracker multiplies token usage by the
+  per-1K-token USD rates in `_RATES` (`backend/app/guardrails.py`), deliberately set on the high
+  side so the cap trips early rather than late. If you change `OPENROUTER_MODEL` or
+  `OPENROUTER_MODEL_FALLBACK`, add the new model's prices to `_RATES` — unknown models are billed
 - To reduce cost per turn, switch `OPENROUTER_MODEL` to a cheaper model (e.g. `openai/gpt-4o-mini`).
   The fallback model is already cheap by default.
 - Monitor actual spend in LangFuse and in your OpenRouter billing dashboard.
