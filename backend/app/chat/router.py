@@ -88,7 +88,6 @@ def chat(req: ChatRequest, request: Request) -> dict:
                 "retrieval_scores": []}
     # Substring guard (always on, cheap) + optional ML scanner (LLM Guard) when installed.
     if guardrails.is_injection_attempt(req.message) or injection_scanner.is_injection(req.message):
-        return {"session_id": session_id,
                 "reply": "I can only help with Generation Conscious products and orders. How can I help with that?",
                 "retrieval_scores": []}
     history = memory.get_recent_messages(session_id, limit=10)
