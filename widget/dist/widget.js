@@ -123,6 +123,8 @@
       return r.json();
     }).then(function (data) {
       typing.remove();
+      if (data.session_id) { sessionId = data.session_id; storeSet(KEY, sessionId); }
+      bubble("bot", data.reply || FRIENDLY_ERROR);
     }).catch(function () {
       typing.remove();
       bubble("bot", "I'm having trouble reaching the team right now — please email Info@GenerationConscious.co.");
