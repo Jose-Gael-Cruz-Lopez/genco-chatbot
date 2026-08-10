@@ -28,6 +28,11 @@ class Settings(BaseSettings):
     ESCALATION_EMAIL: str = "Info@GenerationConscious.co"
     PIPEDRIVE_API_TOKEN: str = ""
     PIPEDRIVE_DOMAIN: str = ""
+    # Dev default — must stay identical to .env.example and the README env table.
+    # Includes both spellings of the widget test origin (localhost and 127.0.0.1 are
+    # DIFFERENT CORS origins). Production overrides this with exactly
+    # "https://generationconscious.co" (see LAUNCH_CHECKLIST.md).
+    ALLOWED_ORIGINS: str = "http://localhost:8000,http://localhost:5500,http://127.0.0.1:5500"
     RATE_LIMIT_PER_MINUTE: int = 20
     DAILY_COST_CAP_USD: float = 10.0
 
