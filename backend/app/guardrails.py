@@ -75,6 +75,12 @@ class RateLimiter:
         for k in stale:
             del self._hits[k]
         if len(self._hits) > self.max_keys:
+            # Still over cap (flood of fresh keys): evict oldest-by-last-hit.
+            # Evicted keys restart their minute window, but that only happens
+            # past max_keys distinct clients — the daily cost cap backstops.
+            oldest = sorted(self._hits, key=lambda k: self._hits[k][-1])
+            for k in oldest[: len(self._hits) - self.max_keys]:
+                del self._hits[k]
 
 
 class CostTracker:
