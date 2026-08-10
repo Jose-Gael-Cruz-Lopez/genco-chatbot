@@ -54,9 +54,6 @@ to watch:
 
 ### 3. Brand the widget
 
-`widget/dist/widget.js` still has two placeholders (`PRIMARY` color and `LOGO` URL). Get GC's real
-brand color and a logo URL from Greg, drop them in, and re-open `widget/test.html` to confirm it
-renders correctly.
 
 ### 4. Deploy to Render
 
