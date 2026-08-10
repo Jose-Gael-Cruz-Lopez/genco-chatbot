@@ -168,6 +168,8 @@ def chat(req: ChatRequest, request: Request) -> dict:
                 lead_flow=is_lead_flow_turn(history, current_message=req.message)):
             reply = _ESCALATION_REPLY
             # Tag the trace so the team can filter KB gaps in LangFuse (README /
+            # VERIFICATION check 8: escalations carry the `escalation` tag).
+            span.tag("escalation")
         span.update(model=result["model"], usage=result["usage"], reply=reply)
         _cost.record(result["usage"], result["model"])
     memory.save_message(session_id, "assistant", reply)
