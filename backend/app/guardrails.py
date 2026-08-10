@@ -51,6 +51,7 @@ def consent_note() -> str:
 # NOTE: in-memory, single-instance only — swap in Redis (or similar shared
 # store) for multi-instance deployments. See module docstring.
 class RateLimiter:
+    def __init__(self, per_minute: int, max_keys: int = 10_000):
         self.per_minute = per_minute
         self._hits: dict[str, deque] = defaultdict(deque)
 
