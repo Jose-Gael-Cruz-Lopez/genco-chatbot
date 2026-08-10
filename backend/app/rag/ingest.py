@@ -50,6 +50,7 @@ def ingest_all() -> int:
         # An empty knowledge_base/ is almost certainly an operator error;
         # refuse to wipe the production KB over it.
         return 0
+    # Embed BEFORE any database write — if this raises, the old KB keeps serving.
     vectors = embed_batch([c["content"] for c in all_chunks])
     rows = [{
         "content": c["content"],
