@@ -48,6 +48,39 @@
 
   var launch = document.createElement("button");
   launch.className = "gc-launch"; launch.textContent = "💬"; launch.setAttribute("aria-label", "Open chat");
+
+  /* Panel is built with DOM APIs (no innerHTML) so cfg-supplied values like
+   * LOGO are never interpolated into markup. */
+  var panel = document.createElement("div");
+  panel.className = "gc-panel";
+  panel.setAttribute("role", "dialog");
+  panel.setAttribute("aria-modal", "true");
+  panel.setAttribute("aria-label", "Generation Conscious chat");
+
+  var head = document.createElement("div"); head.className = "gc-head";
+  if (LOGO) {
+    var logoImg = document.createElement("img");
+    logoImg.src = LOGO; logoImg.alt = "";
+    head.appendChild(logoImg);
+  }
+  var title = document.createElement("span"); title.textContent = "Generation Conscious";
+  head.appendChild(title);
+  var closeBtn = document.createElement("button");
+  closeBtn.className = "gc-close"; closeBtn.textContent = "×"; closeBtn.setAttribute("aria-label", "Close");
+  head.appendChild(closeBtn);
+
+  var msgs = document.createElement("div");
+  msgs.className = "gc-msgs";
+  msgs.setAttribute("role", "log");
+  msgs.setAttribute("aria-live", "polite");
+
+  var inputRow = document.createElement("div"); inputRow.className = "gc-input";
+  var input = document.createElement("input");
+  input.type = "text"; input.placeholder = "Type a message…"; input.setAttribute("aria-label", "Type a message");
+  var sendBtn = document.createElement("button"); sendBtn.textContent = "Send";
+  inputRow.appendChild(input); inputRow.appendChild(sendBtn);
+
+  panel.appendChild(head); panel.appendChild(msgs); panel.appendChild(inputRow);
   document.body.appendChild(launch); document.body.appendChild(panel);
 
   var msgs = panel.querySelector(".gc-msgs");
