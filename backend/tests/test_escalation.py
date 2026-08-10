@@ -1,3 +1,4 @@
+from app.escalation import is_lead_flow_turn, should_escalate
 
 
 def test_no_scores_escalates():
