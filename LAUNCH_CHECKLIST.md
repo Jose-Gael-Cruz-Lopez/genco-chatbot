@@ -35,6 +35,8 @@ Work through these items in order before going live. Check each box once verifie
 
 ## Knowledge Base
 
+- [ ] The home-delivery URL hardcoded in the KB (`backend/knowledge_base/products_and_purchasing.md`)
+  and in the system prompt (`backend/app/chat/prompts.py`) is confirmed as the product page:
   `https://generationconscious.co/product/laundry-detergent-sheets/`
   (already set — verify no accidental edits).
 
