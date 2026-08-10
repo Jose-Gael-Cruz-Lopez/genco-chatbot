@@ -80,6 +80,10 @@ def chat(req: ChatRequest, request: Request) -> dict:
                 "reply": "You're sending messages quickly — give me a moment and try again.",
                 "retrieval_scores": []}
     if _cost.exceeded():
+        logger.warning(
+            "Daily cost cap exceeded; returning static unavailable message "
+            "(fallback model NOT invoked).")
+        return {"session_id": echo_id,
                 "reply": "I'm momentarily unavailable. Please email Info@GenerationConscious.co and the team will help.",
                 "retrieval_scores": []}
     # Substring guard (always on, cheap) + optional ML scanner (LLM Guard) when installed.
