@@ -148,6 +148,7 @@
 
   function open() {
     panel.classList.add("open");
+    lockScroll();
     if (!greeted) { greeted = true; if (sessionId) loadHistory(); else greet(); }
   }
   launch.onclick = open;
