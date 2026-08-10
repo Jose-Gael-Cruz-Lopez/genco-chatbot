@@ -2,7 +2,6 @@ import logging
 from app.db import get_supabase
 from app.email_service import send_lead_notification
 from app.pipedrive import create_lead_in_pipedrive
-from app.chat.tools import REQUIRED_FIELDS, validate_lead
 
 log = logging.getLogger(__name__)
 LOW_SIMILARITY = 0.25
