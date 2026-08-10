@@ -4,6 +4,12 @@ Every chat turn emits one trace spanning retrieve -> generate -> respond:
 a `retrieve` span around retrieval, a `generate` generation observation
 carrying model + usage (so the LangFuse cost dashboard picks it up), and a
 `respond` event with the final reply. Escalated turns are tagged `escalation`.
+
+Everything degrades to a silent no-op when LangFuse keys are absent —
+observability must never break a chat turn.
+"""
+
+from collections.abc import Iterator
 from contextlib import contextmanager
 from app.config import get_settings
 
