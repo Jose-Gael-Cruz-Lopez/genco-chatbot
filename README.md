@@ -112,7 +112,7 @@ cp .env.example backend/.env
 # Open backend/.env and fill in all keys (see the Environment Variables section below)
 
 # 4. Apply the database schema in Supabase SQL editor
-# (paste the contents of backend/schema.sql)
+# (paste the contents of backend/app/rag/schema.sql)
 
 # 5. Ingest the knowledge base
 cd backend
