@@ -66,6 +66,8 @@ class RateLimiter:
         q.append(now)
         # Bound memory: a client rotating spoofed X-Forwarded-For values adds
         # one dict entry per request, so prune whenever we outgrow max_keys.
+        if len(self._hits) > self.max_keys:
+            self._prune(now)
         return True
 
 
