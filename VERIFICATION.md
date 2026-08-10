@@ -36,6 +36,8 @@ Confirm in Supabase → Table Editor → `kb_documents` that rows are present.
 
 ```bash
 cd backend
+# The live-key tests gate on SHELL env vars (os.getenv), and pydantic-settings reads
+# backend/.env internally WITHOUT exporting to the process environment — so source it
 python -m pytest tests/test_retrieval.py -v
 ```
 
