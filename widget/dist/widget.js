@@ -163,4 +163,6 @@
   sendBtn.onclick = function () { send(input.value); };
   input.addEventListener("keydown", function (e) { if (e.key === "Enter") send(input.value); });
   document.addEventListener("keydown", function (e) {
+    if (e.key === "Escape" && panel.classList.contains("open")) close();
+  });
 })();
