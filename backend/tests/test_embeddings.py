@@ -1,4 +1,5 @@
 from unittest.mock import patch, MagicMock
+
 from app.rag import embeddings
 
 
