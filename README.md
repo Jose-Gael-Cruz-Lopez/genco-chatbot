@@ -155,7 +155,7 @@ Railway/Fly) dashboard as service environment variables.
 | `ESCALATION_EMAIL` | Destination for lead notifications (default: `Info@GenerationConscious.co`) | GC team preference |
 | `PIPEDRIVE_API_TOKEN` | Pipedrive API token | Pipedrive → User menu → Personal preferences → API |
 | `PIPEDRIVE_DOMAIN` | Pipedrive company subdomain (e.g. `yourcompany`) | Your Pipedrive account URL |
-| `ALLOWED_ORIGINS` | Comma-separated CORS origins (e.g. `https://generationconscious.co`) | Set to the live site before go-live; include `http://localhost:5500` for dev |
+| `ALLOWED_ORIGINS` | Comma-separated CORS origins. Dev default (identical in `config.py` and `.env.example`): `http://localhost:8000,http://localhost:5500,http://127.0.0.1:5500`. The origin must exactly match how `widget/test.html` is served — `localhost` and `127.0.0.1` are different origins. | Production: set to exactly `https://generationconscious.co` before go-live |
 | `RATE_LIMIT_PER_MINUTE` | Max chat requests per IP per minute (default: `20`) | Tune based on traffic |
 | `DAILY_COST_CAP_USD` | Hard daily spend cap in USD (default: `10.0`) | Increase if volume warrants |
 
