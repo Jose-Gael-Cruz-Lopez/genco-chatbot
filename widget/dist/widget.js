@@ -1,4 +1,9 @@
 (function () {
+  /* ── CONFIG ─────────────────────────────────────────────────────────────
+   * Branding below was derived from the live site 2026-08 — confirm with GC
+   * team before go-live (README runbook step 3):
+   *   PRIMARY  #FF0719  = Elementor global color "f55a23f" (kit-5), the red
+   *            used for nav/buttons site-wide; identical to the wordmark
   var cfg = window.GENCO_CONFIG || {};
   var script = document.currentScript;
   var BACKEND_URL = cfg.backendUrl || (script && script.dataset.backendUrl) || "http://localhost:8000";
