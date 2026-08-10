@@ -127,6 +127,7 @@
       bubble("bot", data.reply || FRIENDLY_ERROR);
     }).catch(function () {
       typing.remove();
+      bubble("bot", FRIENDLY_ERROR);
     });
   }
 
