@@ -83,6 +83,7 @@
   panel.appendChild(head); panel.appendChild(msgs); panel.appendChild(inputRow);
   document.body.appendChild(launch); document.body.appendChild(panel);
 
+  var sessionId = storeGet(KEY);
   var greeted = false;
 
   function bubble(role, text) {
