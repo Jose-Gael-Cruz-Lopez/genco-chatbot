@@ -94,8 +94,6 @@ def chat(req: ChatRequest, request: Request) -> dict:
     session_id = memory.get_or_create_session(req.session_id)
     history = memory.get_recent_messages(session_id, limit=10)
     memory.save_message(session_id, "user", req.message)
-    hits = retrieve(req.message, k=5)
-    scores = [h["similarity"] for h in hits]
     context = "\n\n".join(h["content"] for h in hits)
     msgs = prompts.build_messages(prompts.SYSTEM_PROMPT, context, history, req.message)
 
