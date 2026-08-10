@@ -14,6 +14,12 @@ def _row(**kw):
     base.update(kw); return base
 
 
+def _valid_wholesale_fields() -> dict:
+    return {"name": "A", "email": "a@b.com", "phone": "1",
+            "organization": "Org", "estimated_sheets": 500}
+
+
+def _supabase_table(sb) -> MagicMock:
 @patch("app.escalation.create_lead_in_pipedrive", return_value=True)
 @patch("app.escalation.send_lead_notification", return_value=True)
 @patch("app.escalation.get_supabase")
