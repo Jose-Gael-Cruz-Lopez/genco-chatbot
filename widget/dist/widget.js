@@ -40,6 +40,10 @@
     ".gc-input{display:flex;border-top:1px solid #eee}.gc-input input{flex:1;border:0;padding:14px;font-size:14px;outline:none}" +
     ".gc-input button{border:0;background:" + PRIMARY + ";color:#fff;padding:0 18px;cursor:pointer}" +
     ".gc-typing{align-self:flex-start;color:#888;font-style:italic;padding:4px 12px}" +
+    /* 100dvh (with 100vh fallback) so the iOS toolbar doesn't cover the input;
+     * safe-area padding keeps the input row above the home indicator. */
+    "@media(max-width:480px){.gc-panel{right:0;bottom:0;width:100vw;height:100vh;height:100dvh;max-width:100vw;max-height:100vh;max-height:100dvh;border-radius:0}" +
+    ".gc-input{padding-bottom:env(safe-area-inset-bottom)}}";
   var style = document.createElement("style"); style.textContent = css; document.head.appendChild(style);
 
   var launch = document.createElement("button");
