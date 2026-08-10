@@ -50,6 +50,26 @@ MOCK_REPLIES: dict[str, str] = {
     ),
     "answer_from_kb": (
         "Shipping is calculated at checkout using live USPS rates, and sales tax "
+        "applies to New York orders."
+    ),
+    "escalate": (
+        "I want to make sure you get accurate information. I can help you buy sheets, "
+        "set up refill stations for your community, or connect you with our team — email "
+        "Info@GenerationConscious.co or text (516) 619-6174."
+    ),
+    "decline": (
+        "I can only help with Generation Conscious products and orders. "
+        "How can I help with that?"
+    ),
+}
+
+MOCK_SCORES: dict[str, list[float]] = {
+    "redirect_to_store": [0.87, 0.74, 0.61],
+    "collect_lead_fields": [0.52, 0.41, 0.33],
+    "answer_from_kb": [0.83, 0.72, 0.58],
+    "escalate": [0.18, 0.12],   # below the 0.25 grounding threshold
+    "decline": [],              # guard paths return no retrieval scores
+}
 
 
 def classify(reply: str, scores: list) -> str:
