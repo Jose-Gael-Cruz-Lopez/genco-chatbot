@@ -171,6 +171,7 @@ def chat(req: ChatRequest, request: Request) -> dict:
             # VERIFICATION check 8: escalations carry the `escalation` tag).
             span.tag("escalation")
         span.update(model=result["model"], usage=result["usage"], reply=reply)
+        span.event("respond", output=reply)
         _cost.record(result["usage"], result["model"])
     memory.save_message(session_id, "assistant", reply)
     return {"session_id": session_id, "reply": reply, "retrieval_scores": scores}
