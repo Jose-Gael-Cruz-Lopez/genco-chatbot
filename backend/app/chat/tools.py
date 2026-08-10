@@ -78,3 +78,14 @@ def validate_lead(intent: str, fields: dict) -> list[str]:
     if email and not _EMAIL_RE.match(str(email)):
         errors.append("invalid email format")
     return errors
+
+
+_MISSING_PREFIX = "missing required field: "
+
+
+def humanize_lead_errors(errors: list[str]) -> str:
+    """Turn validate_lead errors into a friendly fragment for the user-facing re-prompt.
+
+    The router surfaces it as "I still need a bit more info before I can submit
+    this: <fragment>", so the fragment is a natural-language list of what's needed.
+    """
