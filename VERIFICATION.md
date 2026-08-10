@@ -38,6 +38,8 @@ Confirm in Supabase → Table Editor → `kb_documents` that rows are present.
 cd backend
 # The live-key tests gate on SHELL env vars (os.getenv), and pydantic-settings reads
 # backend/.env internally WITHOUT exporting to the process environment — so source it
+# into the shell first or the test silently skips:
+set -a; source .env; set +a
 python -m pytest tests/test_retrieval.py -v
 ```
 
