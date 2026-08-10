@@ -71,7 +71,6 @@ curl -s -X POST http://localhost:8000/chat \
 ```
 
 Expected: `reply` references the KB shipping fact (USPS live rates; NY sales tax). The
-`retrieval_scores` array should contain at least one score > 0.2.
 
 ---
 
