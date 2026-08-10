@@ -38,9 +38,6 @@ def test_capture_stores_before_notifying(sb, email, pipe):
     parent.attach_mock(email, "email")
     parent.attach_mock(pipe, "pipe")
 
-    lead = escalation.capture_lead("sess", "wholesale",
-        {"name": "A", "email": "a@b.com", "phone": "1",
-         "organization": "Org", "estimated_sheets": 500})
     assert lead["id"] == "lead-1"
     table.insert.assert_called_once()       # stored first
     email.assert_called_once()
