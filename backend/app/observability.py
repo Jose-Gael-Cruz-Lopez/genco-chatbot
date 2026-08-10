@@ -19,6 +19,8 @@ _settings = get_settings()
 _langfuse = None
 
 
+def init_langfuse() -> Any:
+    """Return the shared Langfuse client, or None when keys are absent."""
     global _langfuse
     if _langfuse is None and _settings.LANGFUSE_SECRET_KEY:
         from langfuse import Langfuse
