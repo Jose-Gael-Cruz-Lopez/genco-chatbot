@@ -165,6 +165,12 @@ def main(argv: list[str] | None = None) -> int:
         got = classify(data.get("reply", ""), scores)
         ok = got == case["expected"]
         passed += ok
+        print(f"[{'PASS' if ok else 'FAIL'}] {case['question'][:40]!r} "
+              f"expected={case['expected']} got={got}")
+
+    total = len(cases)
+    mode = "mock" if mock else "live"
+    print(f"\n{passed}/{total} passed ({mode}) | avg latency {sum(lat)/len(lat):.2f}s | "
           f"avg score {sum(sc)/len(sc) if sc else 0:.3f}")
 
 
