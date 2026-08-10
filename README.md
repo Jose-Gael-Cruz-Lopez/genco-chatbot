@@ -54,6 +54,17 @@ to watch:
 
 ### 3. Brand the widget
 
+The `CONFIG` block at the top of `widget/dist/widget.js` now carries brand values derived from the
+live site (2026-08): `PRIMARY` `#FF0719` and `LOGO` pointing at the site's wordmark image. **Confirm
+both with Greg** (and swap in team-approved values if they differ), then re-open `widget/test.html`
+to confirm it renders correctly. Two ways to view it (documented in `widget/test.html` itself):
+
+- **Zero keys (offline stub):** open `widget/test.html?stub=1` directly from disk (an inline fetch
+  mock answers `/chat` and `/history`), or run `python widget/stub_server.py` (stdlib only) and
+  open the page. Either exercises the full conversation UI without any credentials.
+- **Real backend:** serve the page over HTTP so its origin passes CORS —
+  `cd widget && python -m http.server 5500`, then open `http://localhost:5500/test.html`
+  (this origin is in the dev `ALLOWED_ORIGINS` default; opening via `file://` is CORS-blocked).
 
 ### 4. Deploy to Render
 
