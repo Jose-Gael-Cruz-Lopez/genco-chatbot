@@ -90,7 +90,6 @@ directly:
 curl -s -X POST http://localhost:8000/chat \
   -H "Content-Type: application/json" \
   -d '{
-    "session_id": "verify-wholesale-001",
     "message": "I want to buy wholesale. My name is Test User, email test@example.com, phone 5551234567, org Acme Corp, and I estimate 500 sheets."
   }' | python -m json.tool
 ```
