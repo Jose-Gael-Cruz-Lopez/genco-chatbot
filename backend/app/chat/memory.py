@@ -3,6 +3,11 @@ import uuid
 from app.db import get_supabase
 
 
+def _is_uuid(value: str | None) -> bool:
+    # chat_sessions.id / chat_messages.session_id are Postgres uuid columns; filtering them
+    # with a non-UUID string makes PostgREST raise APIError 22P02, so validate first.
+
+
 def get_or_create_session(session_id: str | None) -> str:
     sb = get_supabase()
     if session_id:
