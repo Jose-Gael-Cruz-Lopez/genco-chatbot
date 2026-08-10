@@ -21,8 +21,6 @@ from collections import defaultdict, deque
 _INJECTION = ("ignore previous", "ignore all previous", "system prompt",
               "reveal your", "disregard", "you are now", "act as",
               "ignore all", "override", "forget everything", "new instructions")
-# rough $/1K tokens for cost estimation; tune per model
-_RATES = {"default": 0.003}
 
 
 def is_injection_attempt(text: str) -> bool:
