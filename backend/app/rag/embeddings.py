@@ -24,5 +24,13 @@ def embed_batch(texts: list[str]) -> list[list[float]]:
     for vector in vectors:
         if len(vector) != EMBEDDING_DIM:
             raise ValueError(
+                f"Embedding model {_settings.EMBEDDING_MODEL!r} returned a "
+                f"{len(vector)}-dim vector but the kb_documents schema is fixed "
+                f"at vector({EMBEDDING_DIM}). Switching embedding models "
+                "requires a schema migration + full re-ingest (see README)."
+            )
+    return vectors
+
+
 def embed_text(text: str) -> list[float]:
     return embed_batch([text])[0]
