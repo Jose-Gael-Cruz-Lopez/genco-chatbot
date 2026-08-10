@@ -20,6 +20,12 @@ def _valid_wholesale_fields() -> dict:
 
 
 def _supabase_table(sb) -> MagicMock:
+    table = MagicMock()
+    table.insert.return_value.execute.return_value = MagicMock(data=[_row()])
+    sb.return_value.table.return_value = table
+    return table
+
+
 @patch("app.escalation.create_lead_in_pipedrive", return_value=True)
 @patch("app.escalation.send_lead_notification", return_value=True)
 @patch("app.escalation.get_supabase")
