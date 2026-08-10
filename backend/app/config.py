@@ -28,7 +28,6 @@ class Settings(BaseSettings):
     ESCALATION_EMAIL: str = "Info@GenerationConscious.co"
     PIPEDRIVE_API_TOKEN: str = ""
     PIPEDRIVE_DOMAIN: str = ""
-    ALLOWED_ORIGINS: str = "http://localhost:8000,http://127.0.0.1:5500"
     RATE_LIMIT_PER_MINUTE: int = 20
     DAILY_COST_CAP_USD: float = 10.0
 
