@@ -35,6 +35,7 @@ CAPTURE_LEAD_TOOL = {
     "type": "function",
     "function": {
         "name": "capture_lead",
+        "description": _tool_description(),
         "parameters": {
             "type": "object",
             "properties": {
