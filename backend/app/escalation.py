@@ -41,6 +41,19 @@ def is_lead_flow_turn(history: list[dict], current_message: str = "") -> bool:
 
 
 # Server-side grounding safety net, wired into the chat flow (chat/router.py): when the top
+# retrieval similarity is below LOW_SIMILARITY or a high-risk keyword appears, the turn is
+# routed to the team instead of risking an ungrounded answer.
+# Exception: mid-lead-flow turns (lead_flow=True) are never hijacked — field answers naturally
+# score low and may contain incidental keywords ("City Urgent Care").
+# A separate "the model said it lacks the info" override (model_signal) was removed rather than
+# wired: detecting a lacks-info reply is a brittle marker-phrase heuristic that can swap a good
+# answer for the canned escalation, and the un-groundable case is already covered twice — the
+# system prompt's grounding rule directs the model itself to offer the team, and the similarity
+# threshold above catches turns with no KB support.
+def should_escalate(retrieval_scores: list[float],
+                    text: str = "", lead_flow: bool = False) -> bool:
+    if lead_flow:
+        return False
     top = max(retrieval_scores) if retrieval_scores else 0.0
     if top < LOW_SIMILARITY or model_signal:
         return True
