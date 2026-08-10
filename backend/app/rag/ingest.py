@@ -37,21 +37,39 @@ def _window(text: str) -> list[str]:
 
 
 def ingest_all() -> int:
-    sb = get_supabase()
-    sb.table("kb_documents").delete().neq("id", "00000000-0000-0000-0000-000000000000").execute()
+    """Non-destructive re-ingest: embed first, upsert, then drop stale rows.
+
+    The database is never touched before embedding succeeds, so a failed embed
+    (network/key/quota) leaves the old KB serving, and the upsert-before-delete
+    ordering means live queries never see an empty-KB window.
+    """
     all_chunks: list[dict] = []
     for md_file in sorted(KB_DIR.glob("*.md")):
         all_chunks.extend(chunk_markdown(md_file.read_text(), md_file.name))
     if not all_chunks:
+        # An empty knowledge_base/ is almost certainly an operator error;
+        # refuse to wipe the production KB over it.
         return 0
+    # Embed BEFORE any database write — if this raises, the old KB keeps serving.
     vectors = embed_batch([c["content"] for c in all_chunks])
-    rows = [{
-        "content": c["content"],
-        "content_hash": hashlib.sha256(c["content"].encode()).hexdigest(),
-        "embedding": v,
-        "metadata": c["metadata"],
-    } for c, v in zip(all_chunks, vectors)]
+    # Dedupe by content_hash: duplicate hashes in one upsert statement fail with
+    # Postgres "ON CONFLICT DO UPDATE command cannot affect row a second time".
+    rows_by_hash: dict[str, dict] = {}
+    for chunk, vector in zip(all_chunks, vectors):
+        content_hash = hashlib.sha256(chunk["content"].encode()).hexdigest()
+        rows_by_hash.setdefault(content_hash, {
+            "content": chunk["content"],
+            "content_hash": content_hash,
+            "embedding": vector,
+            "metadata": chunk["metadata"],
+        })
+    rows = list(rows_by_hash.values())
+    sb = get_supabase()
     sb.table("kb_documents").upsert(rows, on_conflict="content_hash").execute()
+    # Only now remove rows that are no longer part of the KB.
+    sb.table("kb_documents").delete().not_.in_(
+        "content_hash", list(rows_by_hash)
+    ).execute()
     return len(rows)
 
 

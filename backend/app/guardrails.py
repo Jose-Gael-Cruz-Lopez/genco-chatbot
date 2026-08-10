@@ -1,29 +1,60 @@
+"""Guardrails: prompt-injection screening, PII consent note, rate limiting, cost cap.
+
+Durability note (IMPORTANT for operators): RateLimiter and CostTracker state is
+plain process memory. Both reset to zero on every deploy/restart/crash, and each
+uvicorn worker or extra instance keeps its own independent copy — so the "daily"
+cost cap is per-process, not global, and effectively multiplies by the
+worker/instance count. Pin the deploy to a single worker, or swap in a shared
+store (Redis, or a Supabase row keyed by UTC date) before scaling out.
+
+On-topic enforcement is deliberately NOT implemented here: it is delegated to
+the system prompt's "answer only from context" rule plus the retrieval-score
+escalation threshold (see app/escalation.py). A former always-True
+check_on_topic() stub was removed because it was dead code — never called from
+any request path — and tightening it would have silently done nothing.
+"""
+
+import re
 import time
 from collections import defaultdict, deque
 
 _INJECTION = ("ignore previous", "ignore all previous", "system prompt",
               "reveal your", "disregard", "you are now", "act as",
               "ignore all", "override", "forget everything", "new instructions")
-# rough $/1K tokens for cost estimation; tune per model
-_RATES = {"default": 0.003}
+# Match phrases only at word boundaries: "act as a pirate" trips the guard, but
+# "impact assessment" (which contains "act as" as a raw substring) does not.
+_INJECTION_RE = re.compile(
+    r"\b(?:" + "|".join(re.escape(p) for p in _INJECTION) + r")\b")
+
+# USD per 1K tokens, split prompt/completion — OpenRouter list prices for the
+# configured models (high side, so the cap trips early rather than late).
+# Add an entry whenever OPENROUTER_MODEL or OPENROUTER_MODEL_FALLBACK changes.
+# Unknown models fall back to "default", which assumes sonnet-class pricing
+# (the most expensive configured model) so an unlisted model never undercounts.
+_RATES: dict[str, dict[str, float]] = {
+    "anthropic/claude-3.5-sonnet": {"prompt": 0.003, "completion": 0.015},
+    "openai/gpt-4o-mini": {"prompt": 0.00015, "completion": 0.0006},
+    "default": {"prompt": 0.003, "completion": 0.015},
+}
 
 
 def is_injection_attempt(text: str) -> bool:
-    t = text.lower()
-    return any(p in t for p in _INJECTION)
+    return _INJECTION_RE.search(text.lower()) is not None
 
 
-def check_on_topic(text: str) -> bool:
-    # Conservative: treat everything on-topic; the system prompt enforces grounding.
-    # Off-topic handling is delegated to the model's "answer only from context" rule.
-    return True
+def consent_note() -> str:
+    """One-line PII disclosure shown before the bot collects name/email/phone."""
+    return ("Before we continue — I'll only use the contact details you share "
+            "to connect you with our team.")
 
 
-# NOTE: in-memory, single-instance only — swap in Redis (or similar shared store) for multi-instance deployments.
+# NOTE: in-memory, single-instance only — swap in Redis (or similar shared
+# store) for multi-instance deployments. See module docstring.
 class RateLimiter:
-    def __init__(self, per_minute: int):
+    def __init__(self, per_minute: int, max_keys: int = 10_000):
         self.per_minute = per_minute
-        self._hits: dict[str, deque] = defaultdict(deque)
+        self.max_keys = max_keys
+        self._hits: dict[str, deque[float]] = defaultdict(deque)
 
     def allow(self, key: str) -> bool:
         now = time.time()
@@ -33,24 +64,47 @@ class RateLimiter:
         if len(q) >= self.per_minute:
             return False
         q.append(now)
+        # Bound memory: a client rotating spoofed X-Forwarded-For values adds
+        # one dict entry per request, so prune whenever we outgrow max_keys.
+        if len(self._hits) > self.max_keys:
+            self._prune(now)
         return True
+
+    def _prune(self, now: float) -> None:
+        stale = [k for k, q in self._hits.items() if not q or now - q[-1] > 60]
+        for k in stale:
+            del self._hits[k]
+        if len(self._hits) > self.max_keys:
+            # Still over cap (flood of fresh keys): evict oldest-by-last-hit.
+            # Evicted keys restart their minute window, but that only happens
+            # past max_keys distinct clients — the daily cost cap backstops.
+            oldest = sorted(self._hits, key=lambda k: self._hits[k][-1])
+            for k in oldest[: len(self._hits) - self.max_keys]:
+                del self._hits[k]
 
 
 class CostTracker:
+    """Per-process, in-memory daily spend estimator.
+
+    See module docstring: resets on restart, and each worker/instance keeps its
+    own independent accumulator — the cap is per-process, not global.
+    """
+
     def __init__(self, daily_cap_usd: float):
         self.cap = daily_cap_usd
         self._spent = 0.0
         self._day = time.gmtime().tm_yday
 
-    def _roll(self):
+    def _roll(self) -> None:
         today = time.gmtime().tm_yday
         if today != self._day:
             self._day, self._spent = today, 0.0
 
     def record(self, usage: dict, model: str) -> None:
         self._roll()
-        tokens = usage.get("prompt_tokens", 0) + usage.get("completion_tokens", 0)
-        self._spent += (tokens / 1000.0) * _RATES.get(model, _RATES["default"])
+        rates = _RATES.get(model, _RATES["default"])
+        self._spent += ((usage.get("prompt_tokens", 0) / 1000.0) * rates["prompt"]
+                        + (usage.get("completion_tokens", 0) / 1000.0) * rates["completion"])
 
     def exceeded(self) -> bool:
         self._roll()

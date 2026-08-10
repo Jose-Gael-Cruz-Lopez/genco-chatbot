@@ -30,7 +30,7 @@ to stall is the company-dependent items in step 1 — **fire those off first.**
 
 ### 1. Get the keys (the real gate)
 
-Six services must be wired into `.env`: **Supabase** (URL + `service_role` key), **OpenRouter**,
+Six services must be wired into `backend/.env`: **Supabase** (URL + `service_role` key), **OpenRouter**,
 **OpenAI** (embeddings — a *separate* key), **LangFuse** (public + secret), **Resend**, and
 **Pipedrive** (token + subdomain). Three are the company's to provide — loop Greg in now:
 
@@ -43,19 +43,28 @@ can take a while to propagate. Until it's done, lead-notification emails silentl
 
 ### 2. Stand it up locally and run all 8 VERIFICATION.md checks
 
-Fill `.env`, paste `backend/app/rag/schema.sql` into the Supabase SQL editor, run
+Fill `backend/.env`, paste `backend/app/rag/schema.sql` into the Supabase SQL editor, run
 `python -m app.rag.ingest`, confirm `/health`. Then work the eight checks in `VERIFICATION.md`. Two
 to watch:
 
 - **Check 5** — a real wholesale **and** refill lead landing in Supabase **and** the inbox **and**
   Pipedrive. This proves the actual business goal; don't wave it through.
-- **Check 3** — eyeball the printed similarity scores against the `0.25` escalation threshold.
+- **Check 3** — eyeball the printed similarity scores against the `0.25` escalation threshold
+  (`LOW_SIMILARITY` in `backend/app/escalation.py`).
 
 ### 3. Brand the widget
 
-`widget/dist/widget.js` still has two placeholders (`PRIMARY` color and `LOGO` URL). Get GC's real
-brand color and a logo URL from Greg, drop them in, and re-open `widget/test.html` to confirm it
-renders correctly.
+The `CONFIG` block at the top of `widget/dist/widget.js` now carries brand values derived from the
+live site (2026-08): `PRIMARY` `#FF0719` and `LOGO` pointing at the site's wordmark image. **Confirm
+both with Greg** (and swap in team-approved values if they differ), then re-open `widget/test.html`
+to confirm it renders correctly. Two ways to view it (documented in `widget/test.html` itself):
+
+- **Zero keys (offline stub):** open `widget/test.html?stub=1` directly from disk (an inline fetch
+  mock answers `/chat` and `/history`), or run `python widget/stub_server.py` (stdlib only) and
+  open the page. Either exercises the full conversation UI without any credentials.
+- **Real backend:** serve the page over HTTP so its origin passes CORS —
+  `cd widget && python -m http.server 5500`, then open `http://localhost:5500/test.html`
+  (this origin is in the dev `ALLOWED_ORIGINS` default; opening via `file://` is CORS-blocked).
 
 ### 4. Deploy to Render
 
@@ -68,7 +77,7 @@ you paste them there), let it build, then confirm `/health` is green and
 
 You'll need temporary WP admin from Greg. Paste the embed snippet into WordPress (header/footer
 plugin or Elementor block) with `data-backend-url` pointing at the Render host. In the Render env,
-set `ALLOWED_ORIGINS` to **just** `https://generationconscious.co` (drop localhost). Then re-run a
+set `ALLOWED_ORIGINS` to **just** `https://generationconscious.co` (drop all dev origins). Then re-run a
 lead end-to-end against production and do the **mobile + desktop QA** pass.
 
 ### 6. Optional, after it's live
@@ -97,12 +106,13 @@ source venv/bin/activate  # Windows: venv\Scripts\activate
 # 2. Install dependencies
 pip install -r backend/requirements.txt
 
-# 3. Configure environment
-cp .env.example .env
-# Open .env and fill in all keys (see the Environment Variables section below)
+# 3. Configure environment — the env file lives at backend/.env
+# (config.py anchors env_file to backend/.env; a repo-root .env is never read)
+cp .env.example backend/.env
+# Open backend/.env and fill in all keys (see the Environment Variables section below)
 
 # 4. Apply the database schema in Supabase SQL editor
-# (paste the contents of backend/schema.sql)
+# (paste the contents of backend/app/rag/schema.sql)
 
 # 5. Ingest the knowledge base
 cd backend
@@ -125,8 +135,8 @@ python -m pytest -v
 
 ## Environment Variables
 
-All values live in `.env` (git-ignored). Set the same variables in the Render (or Railway/Fly)
-dashboard as service environment variables.
+All values live in `backend/.env` (git-ignored). Set the same variables in the Render (or
+Railway/Fly) dashboard as service environment variables.
 
 | Variable | Description | Where to get it |
 |---|---|---|
@@ -145,7 +155,7 @@ dashboard as service environment variables.
 | `ESCALATION_EMAIL` | Destination for lead notifications (default: `Info@GenerationConscious.co`) | GC team preference |
 | `PIPEDRIVE_API_TOKEN` | Pipedrive API token | Pipedrive → User menu → Personal preferences → API |
 | `PIPEDRIVE_DOMAIN` | Pipedrive company subdomain (e.g. `yourcompany`) | Your Pipedrive account URL |
-| `ALLOWED_ORIGINS` | Comma-separated CORS origins (e.g. `https://generationconscious.co`) | Set to the live site before go-live; include `http://localhost:5500` for dev |
+| `ALLOWED_ORIGINS` | Comma-separated CORS origins. Dev default (identical in `config.py` and `.env.example`): `http://localhost:8000,http://localhost:5500,http://127.0.0.1:5500`. The origin must exactly match how `widget/test.html` is served — `localhost` and `127.0.0.1` are different origins. | Production: set to exactly `https://generationconscious.co` before go-live |
 | `RATE_LIMIT_PER_MINUTE` | Max chat requests per IP per minute (default: `20`) | Tune based on traffic |
 | `DAILY_COST_CAP_USD` | Hard daily spend cap in USD (default: `10.0`) | Increase if volume warrants |
 
@@ -172,7 +182,7 @@ The build context is the **repository root** (not `backend/`) so `widget/dist/` 
 ```bash
 # from the repo root
 docker build -f backend/Dockerfile -t genco-chatbot .
-docker run -p 8000:8000 --env-file .env genco-chatbot
+docker run -p 8000:8000 --env-file backend/.env genco-chatbot
 ```
 
 ---
@@ -224,7 +234,7 @@ Build manually from the repo root for local testing:
 ```bash
 # from repo root, not backend/
 docker build -f backend/Dockerfile -t genco-chatbot .
-docker run -p 8000:8000 --env-file .env genco-chatbot
+docker run -p 8000:8000 --env-file backend/.env genco-chatbot
 ```
 
 `widget/dist/widget.js` is committed to the repo (it's a single hand-authored file, no build
@@ -314,6 +324,25 @@ Open [cloud.langfuse.com](https://cloud.langfuse.com) and navigate to your proje
   fallback model. The fallback model (`OPENROUTER_MODEL_FALLBACK`) is invoked only when the
   primary model call fails after its internal retries. Adjust the cap in the Render environment
   variables.
+- **The cost tracker is in-memory and per-process** (`CostTracker` in `backend/app/guardrails.py`):
+  it resets to zero on every deploy, restart, or crash, and each uvicorn worker or extra instance
+  keeps its own independent accumulator — so the "daily" cap is per-process, not global, and
+  effectively multiplies by the worker/instance count. Pin the deploy to a single worker, or swap
+  in a shared store (Redis, or a Supabase row keyed by UTC date) before scaling out.
+- **Spend is an estimate from hardcoded prices**: the tracker multiplies token usage by the
+  per-1K-token USD rates in `_RATES` (`backend/app/guardrails.py`), deliberately set on the high
+  side so the cap trips early rather than late. If you change `OPENROUTER_MODEL` or
+  `OPENROUTER_MODEL_FALLBACK`, add the new model's prices to `_RATES` — unknown models are billed
+  at the `default` (sonnet-class) rate, which never undercounts but will overcount cheap models
+  and trip the cap sooner than real spend warrants.
+- **Embedding spend is not counted**: the tracker only meters OpenRouter chat completions. Query
+  embeddings billed to `EMBEDDING_API_KEY` (fractions of a cent per turn with
+  `text-embedding-3-small`) sit outside the cap — watch them on the OpenAI billing page.
+- **Guard-blocked turns are stateless by design**: requests stopped by the rate limit, the daily
+  cost cap, or the injection guard get their static reply without touching Supabase or LangFuse —
+  no `chat_messages` row, no trace. Those exchanges therefore do not reappear via `GET /history`
+  after a page reload. This is deliberate: the gates run before any DB access so abusive traffic
+  costs nothing downstream.
 - To reduce cost per turn, switch `OPENROUTER_MODEL` to a cheaper model (e.g. `openai/gpt-4o-mini`).
   The fallback model is already cheap by default.
 - Monitor actual spend in LangFuse and in your OpenRouter billing dashboard.
@@ -345,6 +374,19 @@ If either notification fails, the Supabase row persists with `emailed=false` or
   WHERE created_at < NOW() - INTERVAL '90 days';
   ```
   Schedule this in Supabase's pg_cron extension or via a cron job on your server.
+
+---
+
+## Fast-Follow: Token Streaming
+
+v1 is deliberately **non-streaming**: `POST /chat` returns the full reply as a single JSON body.
+The approved design (docs/superpowers/specs/2026-06-18-genco-chatbot-design.md, "Token streaming")
+shipped it this way and flags **SSE streaming of `/chat` replies as the first fast-follow
+enhancement** — perceived latency is the widget's weakest point, and streaming tokens as they
+arrive from OpenRouter would make it feel dramatically faster. Implementing it means adding a
+streaming variant of the endpoint (SSE or chunked) plus widget changes to render tokens
+incrementally; keep the existing frozen `{session_id, reply, retrieval_scores}` contract intact
+for the embedded widget until both sides are updated.
 
 ---
 
@@ -414,25 +456,36 @@ remains the lightweight, no-key eval; DeepEval is the deeper, judge-based gate.
 genco-chatbot/
 ├── backend/
 │   ├── app/
-│   │   ├── main.py          # FastAPI app, CORS, static widget mount
-│   │   ├── config.py        # pydantic-settings Settings class
-│   │   ├── llm.py           # OpenRouter completions + fallback
-│   │   ├── rag/             # ingest, embed, retrieve
-│   │   ├── chat/            # router, prompts, memory
-│   │   ├── leads/           # capture_lead, notify, Pipedrive
-│   │   └── guardrails/      # rate limit, cost cap, injection guard
-│   ├── knowledge_base/      # *.md source documents
-│   ├── tests/               # pytest suite
-│   ├── eval/                # run_eval.py harness
-│   ├── schema.sql           # Supabase schema (apply once)
+│   │   ├── main.py              # FastAPI app, CORS, static widget mount
+│   │   ├── config.py            # pydantic-settings Settings (reads backend/.env)
+│   │   ├── db.py                # Supabase client factory
+│   │   ├── llm.py               # OpenRouter completions + fallback model
+│   │   ├── observability.py     # LangFuse tracing
+│   │   ├── escalation.py        # should_escalate + capture_lead (store-first)
+│   │   ├── email_service.py     # Resend lead-notification email
+│   │   ├── pipedrive.py         # Pipedrive person + deal creation
+│   │   ├── guardrails.py        # rate limit, cost cap (_RATES), injection substring guard
+│   │   ├── injection_scanner.py # optional ML injection scanner (LLM Guard, lazy)
+│   │   ├── rag/                 # embeddings.py, ingest.py, retrieve.py, schema.sql
+│   │   └── chat/                # router.py, prompts.py, memory.py, tools.py
+│   ├── knowledge_base/          # *.md source documents
+│   ├── tests/                   # pytest suite
 │   ├── requirements.txt
-│   └── Dockerfile           # built from repo root (bundles widget/dist)
+│   ├── requirements-ml.txt      # optional ML extras (LLM Guard, DeepEval)
+│   ├── pytest.ini
+│   └── Dockerfile               # built from repo root (bundles widget/dist)
+├── eval/                        # run_eval.py + test_set.jsonl (repo root — run from here)
 ├── widget/
-│   └── dist/
-│       └── widget.js        # embed widget (single hand-authored file)
-├── render.yaml              # Render Blueprint (repo root; dockerContext: .)
-├── .env.example
-├── VERIFICATION.md          # deferred live-key checks
-├── LAUNCH_CHECKLIST.md      # pre-launch gate checklist
-└── README.md                # this file
+│   ├── dist/
+│   │   └── widget.js            # embed widget (single hand-authored file)
+│   ├── test.html                # widget QA page (offline stub via ?stub=1)
+│   └── stub_server.py           # zero-key stub backend for widget QA
+├── render.yaml                  # Render Blueprint (repo root; dockerContext: .)
+├── .env.example                 # template — copy to backend/.env
+├── VERIFICATION.md              # deferred live-key checks
+├── LAUNCH_CHECKLIST.md          # pre-launch gate checklist
+└── README.md                    # this file
 ```
+
+The Supabase schema lives at `backend/app/rag/schema.sql` (there is no `backend/schema.sql`), and
+lead logic is flat modules under `backend/app/` — there are no `leads/` or `guardrails/` packages.

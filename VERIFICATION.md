@@ -1,7 +1,8 @@
 # Verification Checklist — Deferred Live-Key Checks
 
 These checks require real credentials and a running Supabase project. Run them after all env vars
-in `.env` are filled in and the backend is reachable.
+in `backend/.env` are filled in (`cp .env.example backend/.env`, then fill — the backend reads
+only `backend/.env`) and the backend is reachable.
 
 ---
 
@@ -35,11 +36,20 @@ Confirm in Supabase → Table Editor → `kb_documents` that rows are present.
 
 ```bash
 cd backend
+# The live-key tests gate on SHELL env vars (os.getenv), and pydantic-settings reads
+# backend/.env internally WITHOUT exporting to the process environment — so source it
+# into the shell first or the test silently skips:
+set -a; source .env; set +a
 python -m pytest tests/test_retrieval.py -v
 ```
 
-Expected: all assertions pass with cosine-similarity scores > 0.2. A score below 0.2 on any
-fixture query indicates the embeddings or the `match_documents` threshold need tuning.
+Expected: all assertions pass with top cosine-similarity scores >= 0.25 — the live grounding
+bar (`LOW_SIMILARITY` in `backend/app/escalation.py`), which the test imports directly.
+
+**A "skipped" result is NOT a pass.** `1 skipped` means `SUPABASE_URL` / `EMBEDDING_API_KEY`
+are not visible to the shell — source `backend/.env` as above and re-run until the test actually
+executes. A top score below 0.25 on any fixture query indicates the embeddings or the
+`match_documents` threshold need tuning.
 
 ---
 
@@ -52,16 +62,22 @@ cd backend
 uvicorn app.main:app --reload
 ```
 
-Send a grounded question:
+Send a grounded question (omit `session_id` on the first turn — it is optional):
 
 ```bash
 curl -s -X POST http://localhost:8000/chat \
   -H "Content-Type: application/json" \
-  -d '{"session_id":"verify-001","message":"Do you ship to New York?"}' | python -m json.tool
+  -d '{"message":"Do you ship to New York?"}' | python -m json.tool
 ```
 
 Expected: `reply` references the KB shipping fact (USPS live rates; NY sales tax). The
-`retrieval_scores` array should contain at least one score > 0.2.
+`retrieval_scores` array should contain at least one score >= 0.25 (the `LOW_SIMILARITY`
+escalation bar — below it the bot routes to the team instead of answering).
+
+The response's `session_id` is a **server-minted UUID** (`chat_sessions.id` is a Postgres uuid
+column). To continue the same conversation, pass that exact UUID back in the next request.
+A hand-typed non-UUID value (e.g. `"verify-001"`) is ignored: the server mints a fresh session
+and returns its UUID instead, so history saved under a made-up id will never be found.
 
 ---
 
@@ -74,10 +90,12 @@ directly:
 curl -s -X POST http://localhost:8000/chat \
   -H "Content-Type: application/json" \
   -d '{
-    "session_id": "verify-wholesale-001",
     "message": "I want to buy wholesale. My name is Test User, email test@example.com, phone 5551234567, org Acme Corp, and I estimate 500 sheets."
   }' | python -m json.tool
 ```
+
+(As in check 4, `session_id` is omitted — the server mints a UUID session and returns it. For a
+multi-turn simulation, reuse the returned `session_id` on each subsequent request.)
 
 Verify all three of the following after the call:
 
@@ -96,7 +114,7 @@ Repeat for `intent=refill_station` with fields: `name`, `email`, `phone`, `organ
 Deploy the backend (or run locally) and execute:
 
 ```bash
-cd backend
+# from the REPO ROOT — eval/ lives at the repo root, not under backend/
 python eval/run_eval.py https://YOUR-BACKEND-HOST
 ```
 
@@ -110,9 +128,12 @@ low scores indicate KB gaps; re-ingest after editing the markdown files.
 **Rate limit:** send more than `RATE_LIMIT_PER_MINUTE` (default 20) requests in one minute from
 the same client IP (the limiter keys on `X-Forwarded-For`, so rotating/omitting `session_id` does
 NOT bypass it). Expected: requests beyond the limit return HTTP 200 with the friendly throttle
-message ("You're sending messages quickly — give me a moment and try again.").
+message ("You're sending messages quickly — give me a moment and try again."). Throttled,
+cost-capped, and injection-declined turns are **not persisted or traced by design** — they will
+not appear in `GET /history` or LangFuse, and they echo the client-sent `session_id` (or `""`)
+rather than minting one.
 
-**Cost cap:** temporarily set `DAILY_COST_CAP_USD=0.00001` in `.env` and restart the server,
+**Cost cap:** temporarily set `DAILY_COST_CAP_USD=0.00001` in `backend/.env` and restart the server,
 then send a chat message. Expected: the reply is the static cost-cap message ("I'm momentarily
 unavailable…") — the fallback model is NOT invoked on cost-cap, only on primary model failure.
 Restore `DAILY_COST_CAP_USD` to the real value afterward.

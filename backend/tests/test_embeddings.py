@@ -1,4 +1,7 @@
 from unittest.mock import patch, MagicMock
+
+import pytest
+
 from app.rag import embeddings
 
 
@@ -9,4 +12,22 @@ def test_embed_text_returns_1536_vector():
         c.embeddings.create.return_value = fake
         vec = embeddings.embed_text("hello")
     assert len(vec) == 1536
+    c.embeddings.create.assert_called_once()
+
+
+def test_embedding_dim_constant_matches_schema():
+    assert embeddings.EMBEDDING_DIM == 1536
+
+
+def test_embed_batch_rejects_wrong_dimension():
+    """The kb_documents schema is fixed at vector(1536); a model returning any
+    other size must fail immediately with a named error, not a confusing
+    Postgres insert error at ingest time."""
+    fake = MagicMock()
+    fake.data = [MagicMock(embedding=[0.1] * 768)]
+    with patch.object(embeddings, "_client") as c:
+        c.embeddings.create.return_value = fake
+        with pytest.raises(ValueError, match="1536"):
+            embeddings.embed_batch(["hello"])
+    # A deterministic dimension mismatch must not burn the tenacity retries.
     c.embeddings.create.assert_called_once()

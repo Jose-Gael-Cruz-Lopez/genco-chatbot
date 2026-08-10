@@ -1,9 +1,17 @@
 from functools import lru_cache
+from pathlib import Path
+
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+# Anchor the env file to backend/.env (this file lives at backend/app/config.py) so
+# settings load identically from any CWD — repo root, backend/, or elsewhere. A bare
+# ".env" would resolve against the current working directory and silently load nothing
+# when commands run from the repo root.
+_ENV_FILE = Path(__file__).resolve().parent.parent / ".env"
 
 
 class Settings(BaseSettings):
-    model_config = SettingsConfigDict(env_file=".env", extra="ignore")
+    model_config = SettingsConfigDict(env_file=_ENV_FILE, extra="ignore")
 
     OPENROUTER_API_KEY: str = ""
     OPENROUTER_MODEL: str = "anthropic/claude-3.5-sonnet"
@@ -20,7 +28,11 @@ class Settings(BaseSettings):
     ESCALATION_EMAIL: str = "Info@GenerationConscious.co"
     PIPEDRIVE_API_TOKEN: str = ""
     PIPEDRIVE_DOMAIN: str = ""
-    ALLOWED_ORIGINS: str = "http://localhost:8000,http://127.0.0.1:5500"
+    # Dev default — must stay identical to .env.example and the README env table.
+    # Includes both spellings of the widget test origin (localhost and 127.0.0.1 are
+    # DIFFERENT CORS origins). Production overrides this with exactly
+    # "https://generationconscious.co" (see LAUNCH_CHECKLIST.md).
+    ALLOWED_ORIGINS: str = "http://localhost:8000,http://localhost:5500,http://127.0.0.1:5500"
     RATE_LIMIT_PER_MINUTE: int = 20
     DAILY_COST_CAP_USD: float = 10.0
 

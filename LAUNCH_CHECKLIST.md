@@ -6,6 +6,9 @@ Work through these items in order before going live. Check each box once verifie
 
 ## Embed
 
+- [ ] Widget branding confirmed with Greg: the `CONFIG` block at the top of `widget/dist/widget.js`
+  carries `PRIMARY` `#FF0719` and the site-wordmark `LOGO` URL derived from the live site (2026-08)
+  — swap in team-approved values if they differ.
 - [ ] Widget script tag is live on the Generation Conscious WordPress site.
   Paste the following into a header/footer plugin or Elementor custom-code block:
   ```html
@@ -21,8 +24,9 @@ Work through these items in order before going live. Check each box once verifie
 
 ## Security & CORS
 
-- [ ] `ALLOWED_ORIGINS` is locked to `https://generationconscious.co` in the production
-  environment (remove `http://localhost:5500` and any dev origins before go-live).
+- [ ] `ALLOWED_ORIGINS` is set to exactly `https://generationconscious.co` in the production
+  environment — remove every dev origin (`http://localhost:8000`, `http://localhost:5500`,
+  `http://127.0.0.1:5500`) before go-live.
 - [ ] Rate limiting is keyed on client IP (`X-Forwarded-For`). Confirm Render forwards the real
   client IP (it sets `X-Forwarded-For` by default) so `RATE_LIMIT_PER_MINUTE` is enforced per IP,
   not per browser-supplied session. The daily cost cap is the global backstop.
@@ -31,9 +35,21 @@ Work through these items in order before going live. Check each box once verifie
 
 ## Knowledge Base
 
-- [ ] `STORE_URL` in the KB is confirmed as the home-delivery product page:
+- [ ] The home-delivery URL hardcoded in the KB (`backend/knowledge_base/products_and_purchasing.md`)
+  and in the system prompt (`backend/app/chat/prompts.py`) is confirmed as the product page:
   `https://generationconscious.co/product/laundry-detergent-sheets/`
-  (already set — verify no accidental edits).
+  (already set — verify no accidental edits; there is no `STORE_URL` variable, the URL is plain
+  prose in those two files).
+- [ ] GC team has approved the Mission copy in `backend/knowledge_base/learn_more.md` (drawn from
+  `https://generationconscious.co/about/`, fetched 2026-08-10). If the wording changes, edit the
+  file and re-run `python -m app.rag.ingest` so the live KB picks it up.
+- [ ] Learn More links verified by a **human click-through in a logged-out browser** — both are
+  hardcoded in `backend/knowledge_base/learn_more.md`:
+  - the Lifecycle Assessment Google Drive link renders the PDF (sharing must be
+    "anyone with the link"),
+  - the Instagram refill-station post displays the refill station.
+  Do not trust a `curl` HTTP 200 for either: Drive returns 200 on its access-denied page and
+  Instagram can return a 200 shell for deleted posts.
 
 ---
 

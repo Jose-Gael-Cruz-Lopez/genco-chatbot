@@ -18,3 +18,48 @@ def test_valid_refill_station_passes():
         "name": "A", "email": "a@b.com", "phone": "1", "organization": "Org",
         "num_laundry_rooms": 3, "num_students": 200})
     assert errs == []
+
+
+# --- #22: the tool schema itself must steer the model to collect every per-intent field ---
+
+def test_tool_schema_encodes_per_intent_required_fields():
+    params = tools.CAPTURE_LEAD_TOOL["function"]["parameters"]
+    branches = {b["if"]["properties"]["intent"]["const"]: set(b["then"]["required"])
+                for b in params["allOf"]}
+    for intent, fields in tools.REQUIRED_FIELDS.items():
+        assert branches[intent] == set(fields), intent
+
+
+def test_tool_description_lists_per_intent_fields():
+    desc = tools.CAPTURE_LEAD_TOOL["function"]["description"]
+    for intent, fields in tools.REQUIRED_FIELDS.items():
+        assert intent in desc
+        for f in fields:
+            assert f in desc
+
+
+# --- #22: validation errors surfaced to users must not leak internal field names ---
+
+def test_humanize_lead_errors_maps_field_names():
+    msg = tools.humanize_lead_errors([
+        "missing required field: phone",
+        "missing required field: num_laundry_rooms",
+        "invalid email format"])
+    assert "num_laundry_rooms" not in msg
+    assert "phone number" in msg
+    assert "laundry rooms" in msg
+    assert "email" in msg.lower()
+
+
+def test_humanize_lead_errors_single_field_reads_plainly():
+    msg = tools.humanize_lead_errors(["missing required field: estimated_sheets"])
+    assert "estimated_sheets" not in msg
+    assert "sheet" in msg
+    # No list punctuation for a single missing item.
+    assert "," not in msg and " and " not in msg
+
+
+def test_every_required_field_has_a_human_label():
+    for fields in tools.REQUIRED_FIELDS.values():
+        for f in fields:
+            assert f in tools.FIELD_LABELS, f
