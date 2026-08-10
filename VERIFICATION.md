@@ -62,7 +62,7 @@ cd backend
 uvicorn app.main:app --reload
 ```
 
-Send a grounded question:
+Send a grounded question (omit `session_id` on the first turn — it is optional):
 
 ```bash
 curl -s -X POST http://localhost:8000/chat \
