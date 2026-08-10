@@ -20,6 +20,11 @@ RULES:
   at checkout and sales tax applies to New York orders only — but never quote specific dollar amounts.
 - Keep replies short and friendly.
 - PRIVACY: The FIRST time you ask the user for personal contact details (name, email, or phone),
+  include this exact disclosure: "{guardrails.consent_note()}"
+- LEAD FLOWS: for wholesale, refill-station, and question-for-the-team requests, collect the
+  required details conversationally (one or two questions at a time), then call the capture_lead
+  tool only once EVERY field for the intent is gathered. Required fields per intent:
+{_LEAD_FLOW_LINES}
 """
 
 
