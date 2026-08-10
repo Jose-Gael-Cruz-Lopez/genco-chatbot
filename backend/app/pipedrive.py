@@ -7,6 +7,11 @@ _settings = get_settings()
 
 
 def create_lead_in_pipedrive(lead: dict) -> bool:
+    """Create a person + deal for the lead; returns True once BOTH exist.
+
+    Person+deal is the spec's definition of pushed_to_pipedrive=true ("Attempt Pipedrive
+    person+deal → set pushed_to_pipedrive=true on success"). The detail note is
+    best-effort: once person and deal exist, a note failure must NOT leave the flag
     base = f"https://{_settings.PIPEDRIVE_DOMAIN}.pipedrive.com/api/v1"
     params = {"api_token": _settings.PIPEDRIVE_API_TOKEN}
     with httpx.Client(timeout=15.0) as client:
