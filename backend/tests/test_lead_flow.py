@@ -58,4 +58,6 @@ def test_capture_stores_before_notifying(sb, email, pipe):
 @patch("app.escalation.send_lead_notification", side_effect=Exception("down"))
 @patch("app.escalation.get_supabase")
 def test_notify_failures_do_not_raise(sb, email, pipe):
+    table = _supabase_table(sb)
+    lead = escalation.capture_lead("sess", "wholesale", _valid_wholesale_fields())
     assert lead["id"] == "lead-1"   # lead persisted despite both notifications failing
