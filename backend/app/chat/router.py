@@ -39,6 +39,16 @@ _TOOL_REPROMPT_REPLY = (
 # be available so the lead is never silently lost.
 _LEAD_FALLBACK_REPLY = (
     "I wasn't able to submit your details just now, but our team still wants to hear from you — "
+    "please email Info@GenerationConscious.co or text (516) 619-6174 and they'll take care of you."
+)
+
+# Returned when both the primary and fallback models fail (e.g. one OpenRouter outage takes
+# out both) — never 500; keep the frozen {session_id, reply, retrieval_scores} contract.
+_UNAVAILABLE_REPLY = (
+    "I'm momentarily unavailable. Please email Info@GenerationConscious.co or text "
+    "(516) 619-6174 and the team will help."
+)
+
 
 def _client_ip(request: Request) -> str:
     # On Render (and most proxies) the real client is the first hop in X-Forwarded-For.
