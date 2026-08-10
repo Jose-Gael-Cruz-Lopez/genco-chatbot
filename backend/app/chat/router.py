@@ -112,6 +112,21 @@ def chat(req: ChatRequest, request: Request) -> dict:
                                output=result["content"])
         except Exception:
             logger.warning("Primary model failed; retrying with fallback model.")
+            try:
+                with span.generation("generate", messages=msgs) as gen:
+                    result = llm.chat_completion(msgs, tools=[CAPTURE_LEAD_TOOL],
+                                                 use_fallback=True)
+                    gen.set_result(model=result["model"], usage=result["usage"],
+                                   output=result["content"])
+            except Exception:
+                # Both models failed (both go through the same OpenRouter endpoint, so one
+                # outage takes out both). Offer the human path and keep the 200 contract.
+                logger.exception("Fallback model also failed; returning unavailable reply.")
+                span.update(reply=_UNAVAILABLE_REPLY, error="llm_double_failure")
+                span.event("respond", output=_UNAVAILABLE_REPLY)
+                memory.save_message(session_id, "assistant", _UNAVAILABLE_REPLY)
+                return {"session_id": session_id, "reply": _UNAVAILABLE_REPLY,
+                        "retrieval_scores": scores}
         reply = result["content"] or ""
         tool_calls = result.get("tool_calls") or []
         for call in tool_calls:
