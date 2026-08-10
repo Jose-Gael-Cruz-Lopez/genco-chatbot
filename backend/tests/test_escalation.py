@@ -13,8 +13,6 @@ def test_high_similarity_no_escalate():
     assert should_escalate([0.9]) is False
 
 
-
-
 def test_high_risk_keyword_escalates():
     assert should_escalate([0.9], text="I want a refund") is True
 
