@@ -476,11 +476,3 @@ genco-chatbot/
 │   └── Dockerfile               # built from repo root (bundles widget/dist)
 ├── eval/                        # run_eval.py + test_set.jsonl (repo root — run from here)
 ├── widget/
-│   └── dist/
-│       └── widget.js        # embed widget (single hand-authored file)
-├── render.yaml              # Render Blueprint (repo root; dockerContext: .)
-├── .env.example
-├── VERIFICATION.md          # deferred live-key checks
-├── LAUNCH_CHECKLIST.md      # pre-launch gate checklist
-└── README.md                # this file
-```
