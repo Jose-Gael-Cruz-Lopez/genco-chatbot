@@ -31,6 +31,26 @@ from pathlib import Path
 
 CASES = Path(__file__).parent / "test_set.jsonl"
 
+EXPECTED_VALUES = ("answer_from_kb", "collect_lead_fields", "escalate",
+                   "redirect_to_store", "decline")
+
+# The rate limiter's reply (chat/router.py) — matches no classify() branch, so it must be
+# detected and retried rather than scored.
+THROTTLE_SNIPPET = "give me a moment and try again"
+
+# --mock canned replies, one per expected category, mirroring the real backend's wording
+# (escalate/decline are verbatim from chat/router.py) so classify() sees realistic text.
+MOCK_REPLIES: dict[str, str] = {
+    "redirect_to_store": (
+        "You can pick your sheet count, scent, and one-time vs. subscription on our "
+        "product page: https://generationconscious.co/product/laundry-detergent-sheets/"
+    ),
+    "collect_lead_fields": (
+        "Happy to help! Could you share your name, email, phone, and organization?"
+    ),
+    "answer_from_kb": (
+        "Shipping is calculated at checkout using live USPS rates, and sales tax "
+
 
 def classify(reply: str, scores: list) -> str:
     r = reply.lower()
