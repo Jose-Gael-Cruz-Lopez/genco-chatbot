@@ -160,6 +160,8 @@ def main(argv: list[str] | None = None) -> int:
                 next_start = t0 + interval
                 data = ask_backend(args.backend, case["question"])
         lat.append(time.time() - t0)
+        scores = data.get("retrieval_scores", [])
+        sc += scores
         got = classify(data.get("reply", ""), scores)
         ok = got == case["expected"]
         passed += ok
