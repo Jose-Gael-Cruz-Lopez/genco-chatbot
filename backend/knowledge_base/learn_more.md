@@ -15,7 +15,6 @@ Interested in the Workforce Development Case Study? Reach out to the team direct
 
 ## Mission
 
-To learn about the Generation Conscious mission, visit the website. The bot can direct you there or you can browse directly.
 
 ## Refill Station Example
 
