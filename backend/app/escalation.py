@@ -23,6 +23,22 @@ def _looks_like_field_request(content: str) -> bool:
     q_end = text.rfind("?")
     if q_end == -1:
         return False
+    return any(hint in text[:q_end + 1] for hint in _LEAD_FIELD_HINTS)
+
+
+def is_lead_flow_turn(history: list[dict], current_message: str = "") -> bool:
+    """True when the conversation is mid-lead-collection: the user picked a lead-intent
+    quick-reply (now or recently), or the previous assistant message asked for a lead field.
+    Field answers ("John Smith, john@acme.com", "500 sheets") score low against the KB, so the
+    grounding safety net must not hijack these turns."""
+    if current_message.strip().lower() in _LEAD_QUICK_REPLIES:
+        return True
+    for m in history:
+        if m.get("role") == "user" and (m.get("content") or "").strip().lower() in _LEAD_QUICK_REPLIES:
+            return True
+    last_assistant = next((m for m in reversed(history) if m.get("role") == "assistant"), None)
+    return bool(last_assistant and _looks_like_field_request(last_assistant.get("content") or ""))
+
 
 # Server-side grounding safety net, wired into the chat flow (chat/router.py): when the top
 # retrieval similarity is below LOW_SIMILARITY (or a high-risk keyword appears, or the model
