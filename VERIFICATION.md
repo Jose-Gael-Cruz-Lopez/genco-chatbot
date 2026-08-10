@@ -128,6 +128,10 @@ low scores indicate KB gaps; re-ingest after editing the markdown files.
 **Rate limit:** send more than `RATE_LIMIT_PER_MINUTE` (default 20) requests in one minute from
 the same client IP (the limiter keys on `X-Forwarded-For`, so rotating/omitting `session_id` does
 NOT bypass it). Expected: requests beyond the limit return HTTP 200 with the friendly throttle
+message ("You're sending messages quickly — give me a moment and try again."). Throttled,
+cost-capped, and injection-declined turns are **not persisted or traced by design** — they will
+not appear in `GET /history` or LangFuse, and they echo the client-sent `session_id` (or `""`)
+rather than minting one.
 
 **Cost cap:** temporarily set `DAILY_COST_CAP_USD=0.00001` in `.env` and restart the server,
 then send a chat message. Expected: the reply is the static cost-cap message ("I'm momentarily
