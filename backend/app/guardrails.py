@@ -1,3 +1,11 @@
+"""Guardrails: prompt-injection screening, PII consent note, rate limiting, cost cap.
+
+Durability note (IMPORTANT for operators): RateLimiter and CostTracker state is
+plain process memory. Both reset to zero on every deploy/restart/crash, and each
+uvicorn worker or extra instance keeps its own independent copy — so the "daily"
+cost cap is per-process, not global, and effectively multiplies by the
+worker/instance count. Pin the deploy to a single worker, or swap in a shared
+store (Redis, or a Supabase row keyed by UTC date) before scaling out.
 import time
 from collections import defaultdict, deque
 
