@@ -22,3 +22,12 @@ def test_embedding_dim_constant_matches_schema():
 def test_embed_batch_rejects_wrong_dimension():
     """The kb_documents schema is fixed at vector(1536); a model returning any
     other size must fail immediately with a named error, not a confusing
+    Postgres insert error at ingest time."""
+    fake = MagicMock()
+    fake.data = [MagicMock(embedding=[0.1] * 768)]
+    with patch.object(embeddings, "_client") as c:
+        c.embeddings.create.return_value = fake
+        with pytest.raises(ValueError, match="1536"):
+            embeddings.embed_batch(["hello"])
+    # A deterministic dimension mismatch must not burn the tenacity retries.
+    c.embeddings.create.assert_called_once()
