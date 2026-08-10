@@ -103,6 +103,7 @@
   }
   function loadHistory() {
     fetch(BACKEND_URL + "/history?session_id=" + encodeURIComponent(sessionId))
+      .then(function (r) { if (!r.ok) { throw new Error("HTTP " + r.status); } return r.json(); })
       .then(function (data) {
         if (data.messages && data.messages.length) {
           data.messages.forEach(function (m) { bubble(m.role, m.content); });
