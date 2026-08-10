@@ -95,6 +95,16 @@ def chat(req: ChatRequest, request: Request) -> dict:
     history = memory.get_recent_messages(session_id, limit=10)
     memory.save_message(session_id, "user", req.message)
 
+    # The trace opens BEFORE retrieval so it spans the full retrieve -> generate -> respond
+    # pipeline (CLAUDE.md convention; VERIFICATION check 8).
+    with trace_turn("chat", message=req.message) as span:
+        with span.span("retrieve", query=req.message) as retrieval:
+            hits = retrieve(req.message, k=5)
+            scores = [h["similarity"] for h in hits]
+            retrieval.set_output({"scores": scores})
+        span.update(scores=scores)
+        context = "\n\n".join(h["content"] for h in hits)
+        msgs = prompts.build_messages(prompts.SYSTEM_PROMPT, context, history, req.message)
         try:
             result = llm.chat_completion(msgs, tools=[CAPTURE_LEAD_TOOL])
         except Exception:
