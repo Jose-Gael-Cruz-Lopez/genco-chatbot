@@ -51,6 +51,10 @@ CAPTURE_LEAD_TOOL = {
                 "question": {"type": "string"},
             },
             "required": ["intent", "name", "email"],
+            # Per-intent required fields (single source of truth: REQUIRED_FIELDS), so a
+            # schema-compliant model is steered to collect everything BEFORE emitting the
+            # call. Server-side validate_lead remains the backstop.
+            "allOf": [
         },
     },
 }
