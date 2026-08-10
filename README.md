@@ -106,6 +106,10 @@ source venv/bin/activate  # Windows: venv\Scripts\activate
 # 2. Install dependencies
 pip install -r backend/requirements.txt
 
+# 3. Configure environment — the env file lives at backend/.env
+# (config.py anchors env_file to backend/.env; a repo-root .env is never read)
+cp .env.example backend/.env
+# Open backend/.env and fill in all keys (see the Environment Variables section below)
 
 # 4. Apply the database schema in Supabase SQL editor
 # (paste the contents of backend/schema.sql)
