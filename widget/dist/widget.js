@@ -83,9 +83,6 @@
   panel.appendChild(head); panel.appendChild(msgs); panel.appendChild(inputRow);
   document.body.appendChild(launch); document.body.appendChild(panel);
 
-  var msgs = panel.querySelector(".gc-msgs");
-  var input = panel.querySelector("input");
-  var sessionId = localStorage.getItem(KEY);
   var greeted = false;
 
   function bubble(role, text) {
