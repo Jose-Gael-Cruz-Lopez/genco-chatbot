@@ -43,7 +43,7 @@ can take a while to propagate. Until it's done, lead-notification emails silentl
 
 ### 2. Stand it up locally and run all 8 VERIFICATION.md checks
 
-Fill `.env`, paste `backend/app/rag/schema.sql` into the Supabase SQL editor, run
+Fill `backend/.env`, paste `backend/app/rag/schema.sql` into the Supabase SQL editor, run
 `python -m app.rag.ingest`, confirm `/health`. Then work the eight checks in `VERIFICATION.md`. Two
 to watch:
 
