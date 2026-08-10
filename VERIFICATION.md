@@ -43,6 +43,13 @@ set -a; source .env; set +a
 python -m pytest tests/test_retrieval.py -v
 ```
 
+Expected: all assertions pass with top cosine-similarity scores >= 0.25 — the live grounding
+bar (`LOW_SIMILARITY` in `backend/app/escalation.py`), which the test imports directly.
+
+**A "skipped" result is NOT a pass.** `1 skipped` means `SUPABASE_URL` / `EMBEDDING_API_KEY`
+are not visible to the shell — source `backend/.env` as above and re-run until the test actually
+executes. A top score below 0.25 on any fixture query indicates the embeddings or the
+`match_documents` threshold need tuning.
 
 ---
 
