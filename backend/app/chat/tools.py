@@ -55,6 +55,11 @@ CAPTURE_LEAD_TOOL = {
             # schema-compliant model is steered to collect everything BEFORE emitting the
             # call. Server-side validate_lead remains the backstop.
             "allOf": [
+                {"if": {"properties": {"intent": {"const": intent}},
+                        "required": ["intent"]},
+                 "then": {"required": fields}}
+                for intent, fields in REQUIRED_FIELDS.items()
+            ],
         },
     },
 }
