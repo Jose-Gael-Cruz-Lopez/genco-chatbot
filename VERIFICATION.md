@@ -71,6 +71,13 @@ curl -s -X POST http://localhost:8000/chat \
 ```
 
 Expected: `reply` references the KB shipping fact (USPS live rates; NY sales tax). The
+`retrieval_scores` array should contain at least one score >= 0.25 (the `LOW_SIMILARITY`
+escalation bar — below it the bot routes to the team instead of answering).
+
+The response's `session_id` is a **server-minted UUID** (`chat_sessions.id` is a Postgres uuid
+column). To continue the same conversation, pass that exact UUID back in the next request.
+A hand-typed non-UUID value (e.g. `"verify-001"`) is ignored: the server mints a fresh session
+and returns its UUID instead, so history saved under a made-up id will never be found.
 
 ---
 
