@@ -37,8 +37,6 @@ def _window(text: str) -> list[str]:
 
 
 def ingest_all() -> int:
-    sb = get_supabase()
-    sb.table("kb_documents").delete().neq("id", "00000000-0000-0000-0000-000000000000").execute()
     all_chunks: list[dict] = []
     for md_file in sorted(KB_DIR.glob("*.md")):
         all_chunks.extend(chunk_markdown(md_file.read_text(), md_file.name))
