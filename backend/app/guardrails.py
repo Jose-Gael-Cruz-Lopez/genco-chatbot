@@ -48,6 +48,8 @@ def consent_note() -> str:
             "to connect you with our team.")
 
 
+# NOTE: in-memory, single-instance only — swap in Redis (or similar shared
+# store) for multi-instance deployments. See module docstring.
 class RateLimiter:
     def __init__(self, per_minute: int):
         self.per_minute = per_minute
