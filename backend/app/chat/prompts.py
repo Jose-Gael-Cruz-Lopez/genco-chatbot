@@ -1,3 +1,13 @@
+from app import guardrails
+from app.chat.tools import FIELD_LABELS, REQUIRED_FIELDS
+
+# Generated from REQUIRED_FIELDS/FIELD_LABELS so the prompt can never drift from the
+# server-side validation in capture_lead.
+_LEAD_FLOW_LINES = "\n".join(
+    f"    {intent.replace('_', ' ')}: {', '.join(FIELD_LABELS[f] for f in fields)}"
+    for intent, fields in REQUIRED_FIELDS.items())
+
+SYSTEM_PROMPT = f"""You are the Generation Conscious assistant — warm, concise, and human-sounding.
 Generation Conscious sells sustainable laundry-detergent sheets.
 
 RULES:
