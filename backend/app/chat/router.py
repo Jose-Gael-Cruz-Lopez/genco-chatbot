@@ -51,6 +51,11 @@ _UNAVAILABLE_REPLY = (
 
 
 def _client_ip(request: Request) -> str:
+    # Key on the RIGHTMOST X-Forwarded-For hop: Render (like most reverse proxies) appends the
+    # real connecting IP as the last value, so the rightmost entry is proxy-set and non-spoofable,
+    # while leftmost values arrive straight from the client and can be forged to rotate rate-limit
+    # buckets. Behind additional trusted proxies the rightmost hop may be a proxy address — the
+    # daily cost cap remains the global backstop either way.
     xff = request.headers.get("x-forwarded-for", "")
     if xff:
         return xff.split(",")[0].strip()
