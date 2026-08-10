@@ -12,8 +12,6 @@
   var cfg = window.GENCO_CONFIG || {};
   var script = document.currentScript;
   var BACKEND_URL = cfg.backendUrl || (script && script.dataset.backendUrl) || "http://localhost:8000";
-  var PRIMARY = cfg.primaryColor || "#2e7d32";   // TODO: real GC brand color
-  var LOGO = cfg.logoUrl || "";                   // TODO: real GC logo URL
   var KEY = "genco_session_id";
 
   var css = "" +
