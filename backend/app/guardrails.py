@@ -42,10 +42,6 @@ def is_injection_attempt(text: str) -> bool:
     return _INJECTION_RE.search(text.lower()) is not None
 
 
-def check_on_topic(text: str) -> bool:
-    # Conservative: treat everything on-topic; the system prompt enforces grounding.
-    # Off-topic handling is delegated to the model's "answer only from context" rule.
-    return True
 
 
 # NOTE: in-memory, single-instance only — swap in Redis (or similar shared store) for multi-instance deployments.
