@@ -155,6 +155,9 @@
   function close() {
     panel.classList.remove("open");
     unlockScroll();
+    launch.focus();
+  }
+
   launch.onclick = open;
   panel.querySelector(".gc-close").onclick = function () { panel.classList.remove("open"); };
   panel.querySelector(".gc-input button").onclick = function () { send(input.value); };
