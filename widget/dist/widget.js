@@ -159,5 +159,7 @@
   }
 
   launch.onclick = open;
+  closeBtn.onclick = close;
+  sendBtn.onclick = function () { send(input.value); };
   input.addEventListener("keydown", function (e) { if (e.key === "Enter") send(input.value); });
 })();
