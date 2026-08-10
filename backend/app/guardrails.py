@@ -42,6 +42,10 @@ def is_injection_attempt(text: str) -> bool:
     return _INJECTION_RE.search(text.lower()) is not None
 
 
+def consent_note() -> str:
+    """One-line PII disclosure shown before the bot collects name/email/phone."""
+    return ("Before we continue — I'll only use the contact details you share "
+            "to connect you with our team.")
 
 
 # NOTE: in-memory, single-instance only — swap in Redis (or similar shared store) for multi-instance deployments.
