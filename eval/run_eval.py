@@ -92,6 +92,73 @@ def load_cases() -> list[dict]:
     for n, line in enumerate(CASES.read_text().splitlines(), start=1):
         if not line.strip():
             continue
+        case = json.loads(line)
+        if case.get("expected") not in EXPECTED_VALUES:
+            sys.exit(f"test_set.jsonl line {n}: invalid expected value "
+                     f"{case.get('expected')!r} (must be one of: {', '.join(EXPECTED_VALUES)})")
+        cases.append(case)
+    if not cases:
+        sys.exit(f"no cases found in {CASES}")
+    return cases
+
+
+def ask_backend(backend: str, question: str) -> dict:
+    body = json.dumps({"message": question}).encode()
+    req = urllib.request.Request(f"{backend}/chat", body,
+                                 {"Content-Type": "application/json"})
+    with urllib.request.urlopen(req) as resp:
+        return json.loads(resp.read())
+
+
+def ask_mock(case: dict) -> dict:
+    expected = case["expected"]
+    return {"session_id": "mock-session", "reply": MOCK_REPLIES[expected],
+            "retrieval_scores": list(MOCK_SCORES[expected])}
+
+
+def parse_args(argv: list[str]) -> argparse.Namespace:
+    parser = argparse.ArgumentParser(
+        description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    parser.add_argument("backend", nargs="?", default="http://localhost:8000",
+                        help="backend base URL (default: http://localhost:8000)")
+    parser.add_argument("--rps", type=float, default=0.3,
+                        help="live-mode requests per second; 0 disables pacing "
+                             "(default: 0.3, safely under the 20/min rate limit)")
+    parser.add_argument("--mock", action="store_true",
+                        help="run offline against canned per-category replies "
+                             "(also enabled by MOCK=1)")
+    return parser.parse_args(argv)
+
+
+def main(argv: list[str] | None = None) -> int:
+    args = parse_args(sys.argv[1:] if argv is None else argv)
+    mock = args.mock or os.environ.get("MOCK") == "1"
+    interval = (1.0 / args.rps) if args.rps > 0 else 0.0
+    cases = load_cases()
+
+    passed = 0
+    lat: list[float] = []
+    sc: list[float] = []
+    next_start = 0.0
+    for case in cases:
+        if mock:
+            t0 = time.time()
+            data = ask_mock(case)
+        else:
+            wait = next_start - time.time()
+            if wait > 0:
+                time.sleep(wait)
+            t0 = time.time()
+            next_start = t0 + interval
+            data = ask_backend(args.backend, case["question"])
+            if THROTTLE_SNIPPET in data.get("reply", ""):
+                # Rate limit tripped anyway (e.g. --rps 0, or another client sharing the
+                # IP): wait out the rolling 60s window, then retry this case once.
+                print("[throttled] rate limit hit — sleeping 61s, then retrying this case")
+                time.sleep(61)
+                t0 = time.time()
+                next_start = t0 + interval
+                data = ask_backend(args.backend, case["question"])
         lat.append(time.time() - t0)
         scores = data.get("retrieval_scores", []); sc += scores
         got = classify(data.get("reply", ""), scores)
