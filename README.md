@@ -383,6 +383,13 @@ v1 is deliberately **non-streaming**: `POST /chat` returns the full reply as a s
 The approved design (docs/superpowers/specs/2026-06-18-genco-chatbot-design.md, "Token streaming")
 shipped it this way and flags **SSE streaming of `/chat` replies as the first fast-follow
 enhancement** — perceived latency is the widget's weakest point, and streaming tokens as they
+arrive from OpenRouter would make it feel dramatically faster. Implementing it means adding a
+streaming variant of the endpoint (SSE or chunked) plus widget changes to render tokens
+incrementally; keep the existing frozen `{session_id, reply, retrieval_scores}` contract intact
+for the embedded widget until both sides are updated.
+
+---
+
 ## Optional ML Enhancements
 
 Two opt-in enhancements live behind `backend/requirements-ml.txt`. They are **not** installed by
