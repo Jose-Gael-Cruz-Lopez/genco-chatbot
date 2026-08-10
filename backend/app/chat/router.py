@@ -69,6 +69,10 @@ class ChatRequest(BaseModel):
 
 @router.post("/chat")
 def chat(req: ChatRequest, request: Request) -> dict:
+    # Guard gates run BEFORE any Supabase call: throttled/capped/declined requests must not
+    # create chat_sessions rows (or cause any other DB load). They echo the client-supplied
+    # session_id (or "") since no session is looked up or minted on these paths.
+    echo_id = req.session_id or ""
     # Rate-limit by client IP, not the browser-supplied session_id (which a client can rotate/omit
     # to mint a fresh bucket every request).
     if not _rate_limiter.allow(_client_ip(request)):
