@@ -48,6 +48,7 @@ def ingest_all() -> int:
         all_chunks.extend(chunk_markdown(md_file.read_text(), md_file.name))
     if not all_chunks:
         # An empty knowledge_base/ is almost certainly an operator error;
+        # refuse to wipe the production KB over it.
         return 0
     vectors = embed_batch([c["content"] for c in all_chunks])
     rows = [{
