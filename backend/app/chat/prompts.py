@@ -20,7 +20,6 @@ RULES:
   at checkout and sales tax applies to New York orders only — but never quote specific dollar amounts.
 - Keep replies short and friendly.
 - PRIVACY: The FIRST time you ask the user for personal contact details (name, email, or phone),
-  briefly note that this information is only used to connect them with the Generation Conscious team.
 """
 
 
