@@ -87,9 +87,6 @@ def classify(reply: str, scores: list) -> str:
     return "answer_from_kb"
 
 
-def main():
-    passed = 0; total = 0; lat = []; sc = []
-    for line in CASES.read_text().splitlines():
         if not line.strip():
             continue
         case = json.loads(line); total += 1
