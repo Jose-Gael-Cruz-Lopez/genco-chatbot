@@ -18,6 +18,9 @@
   var FRIENDLY_ERROR = "I'm having trouble reaching the team right now — please email Info@GenerationConscious.co.";
 
   /* localStorage can throw (Safari private mode, Chrome "Block all cookies");
+   * degrade to a per-pageload session instead of dying mid-IIFE. */
+  function storeGet(k) { try { return window.localStorage.getItem(k); } catch (e) { return null; } }
+  function storeSet(k, v) { try { window.localStorage.setItem(k, v); } catch (e) { /* no-op */ } }
 
   var css = "" +
     ".gc-launch{position:fixed;right:20px;bottom:20px;width:60px;height:60px;border-radius:50%;" +
