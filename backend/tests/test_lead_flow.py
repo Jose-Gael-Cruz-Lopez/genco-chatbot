@@ -3,6 +3,7 @@ from unittest.mock import patch, MagicMock, Mock, call
 import pytest
 
 from app import escalation
+from app.pipedrive import create_lead_in_pipedrive
 
 
 def _row(**kw):
