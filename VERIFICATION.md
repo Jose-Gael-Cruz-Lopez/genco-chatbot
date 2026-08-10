@@ -1,7 +1,6 @@
 # Verification Checklist — Deferred Live-Key Checks
 
 These checks require real credentials and a running Supabase project. Run them after all env vars
-in `.env` are filled in and the backend is reachable.
 
 ---
 
