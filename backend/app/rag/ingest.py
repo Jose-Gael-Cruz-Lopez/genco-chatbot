@@ -47,6 +47,7 @@ def ingest_all() -> int:
     for md_file in sorted(KB_DIR.glob("*.md")):
         all_chunks.extend(chunk_markdown(md_file.read_text(), md_file.name))
     if not all_chunks:
+        # An empty knowledge_base/ is almost certainly an operator error;
         return 0
     vectors = embed_batch([c["content"] for c in all_chunks])
     rows = [{
