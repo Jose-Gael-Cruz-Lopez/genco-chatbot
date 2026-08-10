@@ -30,7 +30,7 @@ to stall is the company-dependent items in step 1 — **fire those off first.**
 
 ### 1. Get the keys (the real gate)
 
-Six services must be wired into `.env`: **Supabase** (URL + `service_role` key), **OpenRouter**,
+Six services must be wired into `backend/.env`: **Supabase** (URL + `service_role` key), **OpenRouter**,
 **OpenAI** (embeddings — a *separate* key), **LangFuse** (public + secret), **Resend**, and
 **Pipedrive** (token + subdomain). Three are the company's to provide — loop Greg in now:
 
