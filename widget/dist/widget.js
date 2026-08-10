@@ -127,7 +127,6 @@
       bubble("bot", data.reply || FRIENDLY_ERROR);
     }).catch(function () {
       typing.remove();
-      bubble("bot", "I'm having trouble reaching the team right now — please email Info@GenerationConscious.co.");
     });
   }
 
