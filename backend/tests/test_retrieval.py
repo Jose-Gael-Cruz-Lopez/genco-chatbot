@@ -1,5 +1,6 @@
 import os
 import pytest
+from app.escalation import LOW_SIMILARITY
 from app.rag import ingest, retrieve
 
 requires_keys = pytest.mark.skipif(
