@@ -131,6 +131,13 @@
     });
   }
 
+  /* Scroll-lock the host page behind the full-screen mobile panel; restore
+   * whatever inline overflow the host had. */
+  var scrollLocked = false;
+  var prevOverflow = "";
+  function lockScroll() {
+  }
+
   function open() {
     panel.classList.add("open");
     if (!greeted) { greeted = true; if (sessionId) loadHistory(); else greet(); }
