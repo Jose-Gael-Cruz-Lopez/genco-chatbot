@@ -476,3 +476,16 @@ genco-chatbot/
 │   └── Dockerfile               # built from repo root (bundles widget/dist)
 ├── eval/                        # run_eval.py + test_set.jsonl (repo root — run from here)
 ├── widget/
+│   ├── dist/
+│   │   └── widget.js            # embed widget (single hand-authored file)
+│   ├── test.html                # widget QA page (offline stub via ?stub=1)
+│   └── stub_server.py           # zero-key stub backend for widget QA
+├── render.yaml                  # Render Blueprint (repo root; dockerContext: .)
+├── .env.example                 # template — copy to backend/.env
+├── VERIFICATION.md              # deferred live-key checks
+├── LAUNCH_CHECKLIST.md          # pre-launch gate checklist
+└── README.md                    # this file
+```
+
+The Supabase schema lives at `backend/app/rag/schema.sql` (there is no `backend/schema.sql`), and
+lead logic is flat modules under `backend/app/` — there are no `leads/` or `guardrails/` packages.
