@@ -471,6 +471,10 @@ genco-chatbot/
 │   ├── knowledge_base/          # *.md source documents
 │   ├── tests/                   # pytest suite
 │   ├── requirements.txt
+│   ├── requirements-ml.txt      # optional ML extras (LLM Guard, DeepEval)
+│   ├── pytest.ini
+│   └── Dockerfile               # built from repo root (bundles widget/dist)
+├── eval/                        # run_eval.py + test_set.jsonl (repo root — run from here)
 ├── widget/
 │   └── dist/
 │       └── widget.js        # embed widget (single hand-authored file)
