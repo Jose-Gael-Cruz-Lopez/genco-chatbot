@@ -1,4 +1,3 @@
-import json, time, sys, urllib.request
 from pathlib import Path
 
 BACKEND = sys.argv[1] if len(sys.argv) > 1 else "http://localhost:8000"
