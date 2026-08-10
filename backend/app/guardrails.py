@@ -70,6 +70,12 @@ class RateLimiter:
             self._prune(now)
         return True
 
+    def _prune(self, now: float) -> None:
+        stale = [k for k, q in self._hits.items() if not q or now - q[-1] > 60]
+        for k in stale:
+            del self._hits[k]
+        if len(self._hits) > self.max_keys:
+
 
 class CostTracker:
     def __init__(self, daily_cap_usd: float):
