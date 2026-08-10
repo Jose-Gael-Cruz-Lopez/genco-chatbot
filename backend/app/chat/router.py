@@ -106,7 +106,6 @@ def chat(req: ChatRequest, request: Request) -> dict:
         context = "\n\n".join(h["content"] for h in hits)
         msgs = prompts.build_messages(prompts.SYSTEM_PROMPT, context, history, req.message)
         try:
-            result = llm.chat_completion(msgs, tools=[CAPTURE_LEAD_TOOL])
         except Exception:
             logger.warning("Primary model failed; retrying with fallback model.")
             result = llm.chat_completion(msgs, tools=[CAPTURE_LEAD_TOOL], use_fallback=True)
