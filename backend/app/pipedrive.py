@@ -12,6 +12,12 @@ def create_lead_in_pipedrive(lead: dict) -> bool:
     Person+deal is the spec's definition of pushed_to_pipedrive=true ("Attempt Pipedrive
     person+deal → set pushed_to_pipedrive=true on success"). The detail note is
     best-effort: once person and deal exist, a note failure must NOT leave the flag
+    false, because a flag-driven retry would re-run this function and duplicate the
+    person and deal in the CRM. The note content is logged on failure so an operator
+    can attach it by hand. Person or deal failures still propagate, leaving the flag
+    false for a safe retry (nothing, or only a person, exists yet — Pipedrive dedupes
+    persons far more gracefully than deals).
+    """
     base = f"https://{_settings.PIPEDRIVE_DOMAIN}.pipedrive.com/api/v1"
     params = {"api_token": _settings.PIPEDRIVE_API_TOKEN}
     with httpx.Client(timeout=15.0) as client:
