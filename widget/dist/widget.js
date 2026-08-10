@@ -48,12 +48,6 @@
 
   var launch = document.createElement("button");
   launch.className = "gc-launch"; launch.textContent = "💬"; launch.setAttribute("aria-label", "Open chat");
-  var panel = document.createElement("div"); panel.className = "gc-panel";
-  panel.innerHTML =
-    '<div class="gc-head">' + (LOGO ? '<img src="' + LOGO + '" alt="">' : "") +
-    '<span>Generation Conscious</span><button class="gc-close" aria-label="Close">×</button></div>' +
-    '<div class="gc-msgs"></div>' +
-    '<div class="gc-input"><input type="text" placeholder="Type a message…"><button>Send</button></div>';
   document.body.appendChild(launch); document.body.appendChild(panel);
 
   var msgs = panel.querySelector(".gc-msgs");
