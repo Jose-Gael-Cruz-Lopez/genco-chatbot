@@ -114,7 +114,7 @@ Repeat for `intent=refill_station` with fields: `name`, `email`, `phone`, `organ
 Deploy the backend (or run locally) and execute:
 
 ```bash
-cd backend
+# from the REPO ROOT — eval/ lives at the repo root, not under backend/
 python eval/run_eval.py https://YOUR-BACKEND-HOST
 ```
 
