@@ -32,6 +32,47 @@ def init_langfuse() -> Any:
     return _langfuse
 
 
+def _to_langfuse_usage(usage: dict | None) -> dict | None:
+    """Map OpenRouter/OpenAI-style token counts to the langfuse 2.x usage
+    shape ({input, output, total, unit}) so cost tracking works."""
+    if not usage:
+        return None
+    prompt = usage.get("prompt_tokens", 0)
+    completion = usage.get("completion_tokens", 0)
+    return {
+        "input": prompt,
+        "output": completion,
+        "total": usage.get("total_tokens", prompt + completion),
+        "unit": "TOKENS",
+    }
+
+
+class _Observation:
+    """Handle yielded inside a span/generation context: collects the kwargs to
+    pass to the observation's end() call. No-op-safe (works with no trace)."""
+
+    def __init__(self) -> None:
+        self.end_kwargs: dict[str, Any] = {}
+
+    def set_output(self, output: Any) -> None:
+        self.end_kwargs["output"] = output
+
+
+class _Generation(_Observation):
+    def set_result(self, *, model: str | None = None, usage: dict | None = None,
+                   output: Any = None) -> None:
+        if model is not None:
+            self.end_kwargs["model"] = model
+        lf_usage = _to_langfuse_usage(usage)
+        if lf_usage is not None:
+            self.end_kwargs["usage"] = lf_usage
+        if output is not None:
+            self.end_kwargs["output"] = output
+
+
+class TurnTrace:
+    """Handle yielded by trace_turn. Every method is a silent no-op when
+    LangFuse keys are absent (self._trace is None)."""
 @contextmanager
 def trace_turn(name: str, **metadata):
     lf = init_langfuse()
