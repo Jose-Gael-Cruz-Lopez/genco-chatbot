@@ -55,6 +55,7 @@ def should_escalate(retrieval_scores: list[float],
     if lead_flow:
         return False
     top = max(retrieval_scores) if retrieval_scores else 0.0
+    if top < LOW_SIMILARITY:
         return True
     return any(k in text.lower() for k in HIGH_RISK_KEYWORDS)
 
