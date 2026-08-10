@@ -1,4 +1,5 @@
 import json
+import logging
 from unittest.mock import patch, MagicMock
 from fastapi.testclient import TestClient
 from app.main import app
