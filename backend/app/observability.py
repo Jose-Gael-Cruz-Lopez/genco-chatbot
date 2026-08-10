@@ -19,7 +19,6 @@ _settings = get_settings()
 _langfuse = None
 
 
-def init_langfuse():
     global _langfuse
     if _langfuse is None and _settings.LANGFUSE_SECRET_KEY:
         from langfuse import Langfuse
