@@ -53,6 +53,7 @@ def test_get_recent_messages_returns_most_recent_in_chronological_order(sb):
     )
     # capture the .order(...) call args
     order_mock = sb.return_value.table.return_value.select.return_value.eq.return_value.order
+    out = memory.get_recent_messages("44444444-4444-4444-4444-444444444444", limit=3)
 
     # ordered by created_at DESC so limit takes the most recent, not the first ever
     args, kwargs = order_mock.call_args
