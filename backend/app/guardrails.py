@@ -84,6 +84,9 @@ class RateLimiter:
 
 
 class CostTracker:
+    """Per-process, in-memory daily spend estimator.
+
+    See module docstring: resets on restart, and each worker/instance keeps its
     def __init__(self, daily_cap_usd: float):
         self.cap = daily_cap_usd
         self._spent = 0.0
