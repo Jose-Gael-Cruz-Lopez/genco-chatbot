@@ -1,3 +1,32 @@
+"""Genco chatbot eval harness — routing/grounding smoke eval over eval/test_set.jsonl.
+
+Usage:
+    python eval/run_eval.py [backend_url] [--rps RPS] [--mock]
+
+    backend_url   Base URL of a running backend (default: http://localhost:8000).
+    --rps RPS     Live-mode pacing, in requests per second. Defaults to 0.3
+                  (one request every ~3.3s) so a full sequential run stays under
+                  the backend's default RATE_LIMIT_PER_MINUTE=20 per IP — the
+                  throttle reply matches no classify() branch and would show up
+                  as spurious FAILs. Pass --rps 0 to disable pacing (e.g. when
+                  the backend's limit was raised for the run). If a throttle
+                  reply slips through anyway, the case waits out the 60s window
+                  and retries once.
+    --mock        Offline mode: no network, no keys, no pacing. Every case is
+                  answered with a canned reply shaped like the real backend's
+                  reply for its category, so test_set.jsonl parsing, classify(),
+                  and the pass/fail + latency + score reporting run end-to-end
+                  against mocks. Setting MOCK=1 in the environment does the same.
+
+Exit status: 0 when every case passes, 1 otherwise.
+"""
+
+import argparse
+import json
+import os
+import sys
+import time
+import urllib.request
 from pathlib import Path
 
 BACKEND = sys.argv[1] if len(sys.argv) > 1 else "http://localhost:8000"
