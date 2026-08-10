@@ -41,10 +41,6 @@ def is_lead_flow_turn(history: list[dict], current_message: str = "") -> bool:
 
 
 # Server-side grounding safety net, wired into the chat flow (chat/router.py): when the top
-# retrieval similarity is below LOW_SIMILARITY (or a high-risk keyword appears, or the model
-# signals it lacks info), the turn is routed to the team instead of risking an ungrounded answer.
-def should_escalate(retrieval_scores: list[float], model_signal: bool = False,
-                    text: str = "") -> bool:
     top = max(retrieval_scores) if retrieval_scores else 0.0
     if top < LOW_SIMILARITY or model_signal:
         return True
