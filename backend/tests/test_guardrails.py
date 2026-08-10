@@ -95,3 +95,19 @@ def test_rate_limiter_blocks_after_cap():
     assert rl.allow("ip2")
 
 
+def test_rate_limiter_prunes_stale_keys(monkeypatch):
+    t = 1_000_000.0
+    monkeypatch.setattr(guardrails.time, "time", lambda: t)
+    rl = guardrails.RateLimiter(per_minute=2, max_keys=3)
+    assert rl.allow("a") and rl.allow("b") and rl.allow("c")
+    t += 120.0  # every key's window has expired
+    assert rl.allow("d")  # pushes past max_keys -> stale a/b/c are swept
+    assert set(rl._hits) == {"d"}
+
+
+def test_rate_limiter_caps_total_keys_under_fresh_key_flood():
+    # Rotating spoofed X-Forwarded-For values must not grow memory unboundedly.
+    rl = guardrails.RateLimiter(per_minute=2, max_keys=3)
+    for i in range(10):
+        rl.allow(f"ip{i}")
+    assert len(rl._hits) <= 3
