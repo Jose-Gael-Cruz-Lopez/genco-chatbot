@@ -34,7 +34,4 @@ def create_lead_in_pipedrive(lead: dict) -> bool:
             "person_id": person_id})
         deal.raise_for_status()
         deal_id = deal.json()["data"]["id"]
-        notes = client.post(f"{base}/notes", params=params,
-                            json={"content": note, "deal_id": deal_id})
-        notes.raise_for_status()
     return True
