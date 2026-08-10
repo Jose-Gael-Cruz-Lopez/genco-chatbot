@@ -159,7 +159,5 @@
   }
 
   launch.onclick = open;
-  panel.querySelector(".gc-close").onclick = function () { panel.classList.remove("open"); };
-  panel.querySelector(".gc-input button").onclick = function () { send(input.value); };
   input.addEventListener("keydown", function (e) { if (e.key === "Enter") send(input.value); });
 })();
