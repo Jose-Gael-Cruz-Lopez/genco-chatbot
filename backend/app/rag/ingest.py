@@ -37,6 +37,12 @@ def _window(text: str) -> list[str]:
 
 
 def ingest_all() -> int:
+    """Non-destructive re-ingest: embed first, upsert, then drop stale rows.
+
+    The database is never touched before embedding succeeds, so a failed embed
+    (network/key/quota) leaves the old KB serving, and the upsert-before-delete
+    ordering means live queries never see an empty-KB window.
+    """
     all_chunks: list[dict] = []
     for md_file in sorted(KB_DIR.glob("*.md")):
         all_chunks.extend(chunk_markdown(md_file.read_text(), md_file.name))
