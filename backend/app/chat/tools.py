@@ -35,7 +35,6 @@ CAPTURE_LEAD_TOOL = {
     "type": "function",
     "function": {
         "name": "capture_lead",
-        "description": "Record a lead once ALL required fields for the intent are collected.",
         "parameters": {
             "type": "object",
             "properties": {
