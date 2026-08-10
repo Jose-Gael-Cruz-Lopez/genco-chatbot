@@ -1,5 +1,7 @@
 from unittest.mock import patch, MagicMock, Mock, call
 
+import pytest
+
 from app import escalation
 
 
