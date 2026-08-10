@@ -94,6 +94,7 @@ curl -s -X POST http://localhost:8000/chat \
   }' | python -m json.tool
 ```
 
+
 Verify all three of the following after the call:
 
 - **Supabase:** a row appears in the `leads` table with `intent=wholesale`, `emailed=true`,
