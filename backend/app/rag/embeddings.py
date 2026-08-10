@@ -11,6 +11,7 @@ EMBEDDING_DIM = 1536
 
 
 @retry(stop=stop_after_attempt(3), wait=wait_exponential(min=1, max=10))
+def _request_embeddings(texts: list[str]) -> list[list[float]]:
     resp = _client.embeddings.create(model=_settings.EMBEDDING_MODEL, input=texts)
     return [d.embedding for d in resp.data]
 
