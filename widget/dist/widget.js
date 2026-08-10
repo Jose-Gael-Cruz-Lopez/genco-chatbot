@@ -150,6 +150,7 @@
     panel.classList.add("open");
     lockScroll();
     if (!greeted) { greeted = true; if (sessionId) loadHistory(); else greet(); }
+    input.focus();
   }
   launch.onclick = open;
   panel.querySelector(".gc-close").onclick = function () { panel.classList.remove("open"); };
