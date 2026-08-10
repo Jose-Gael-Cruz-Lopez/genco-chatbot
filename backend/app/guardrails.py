@@ -64,6 +64,8 @@ class RateLimiter:
         if len(q) >= self.per_minute:
             return False
         q.append(now)
+        # Bound memory: a client rotating spoofed X-Forwarded-For values adds
+        # one dict entry per request, so prune whenever we outgrow max_keys.
         return True
 
 
