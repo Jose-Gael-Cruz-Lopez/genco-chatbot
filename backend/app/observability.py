@@ -73,6 +73,48 @@ class _Generation(_Observation):
 class TurnTrace:
     """Handle yielded by trace_turn. Every method is a silent no-op when
     LangFuse keys are absent (self._trace is None)."""
+
+    def __init__(self, trace: Any, metadata: dict[str, Any]):
+        self._trace = trace
+        self._metadata = metadata
+
+    def update(self, **kw: Any) -> None:
+        self._metadata.update(kw)
+        if self._trace:
+            self._trace.update(metadata=dict(self._metadata))
+
+    def tag(self, *tags: str) -> None:
+        if self._trace:
+            self._trace.update(tags=list(tags))
+
+    def event(self, name: str, **kw: Any) -> None:
+        if self._trace:
+            self._trace.event(name=name, **kw)
+
+    @contextmanager
+    def span(self, name: str, **input_data: Any) -> Iterator[_Observation]:
+        obs = (self._trace.span(name=name, input=input_data or None)
+               if self._trace else None)
+        holder = _Observation()
+        try:
+            yield holder
+        finally:
+            # End even if the wrapped code raised, so latency is recorded.
+            if obs:
+                obs.end(**holder.end_kwargs)
+
+    @contextmanager
+    def generation(self, name: str, **input_data: Any) -> Iterator[_Generation]:
+        obs = (self._trace.generation(name=name, input=input_data or None)
+               if self._trace else None)
+        holder = _Generation()
+        try:
+            yield holder
+        finally:
+            if obs:
+                obs.end(**holder.end_kwargs)
+
+
 @contextmanager
 def trace_turn(name: str, **metadata):
     lf = init_langfuse()
