@@ -24,6 +24,9 @@ Work through these items in order before going live. Check each box once verifie
 
 ## Security & CORS
 
+- [ ] `ALLOWED_ORIGINS` is set to exactly `https://generationconscious.co` in the production
+  environment — remove every dev origin (`http://localhost:8000`, `http://localhost:5500`,
+  `http://127.0.0.1:5500`) before go-live.
 - [ ] Rate limiting is keyed on client IP (`X-Forwarded-For`). Confirm Render forwards the real
   client IP (it sets `X-Forwarded-For` by default) so `RATE_LIMIT_PER_MINUTE` is enforced per IP,
   not per browser-supplied session. The daily cost cap is the global backstop.
