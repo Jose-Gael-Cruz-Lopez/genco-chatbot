@@ -9,6 +9,17 @@ REQUIRED_FIELDS: dict[str, list[str]] = {
     "question": ["name", "email", "question"],
 }
 
+# Human labels for validation re-prompts: the ValueError raised by capture_lead is shown
+# verbatim to the end user, so internal snake_case names must never leak into chat replies.
+FIELD_LABELS: dict[str, str] = {
+    "name": "your name",
+    "email": "your email address",
+    "phone": "your phone number",
+    "organization": "your organization's name",
+    "estimated_sheets": "your estimated total sheet purchase",
+    "num_laundry_rooms": "the number of laundry rooms",
+    "num_students": "the number of students or tenants",
+    "question": "your question for the team",
 CAPTURE_LEAD_TOOL = {
     "type": "function",
     "function": {
