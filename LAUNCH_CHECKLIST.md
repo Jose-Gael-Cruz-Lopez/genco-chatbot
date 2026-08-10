@@ -7,6 +7,8 @@ Work through these items in order before going live. Check each box once verifie
 ## Embed
 
 - [ ] Widget branding confirmed with Greg: the `CONFIG` block at the top of `widget/dist/widget.js`
+  carries `PRIMARY` `#FF0719` and the site-wordmark `LOGO` URL derived from the live site (2026-08)
+  — swap in team-approved values if they differ.
 - [ ] Widget script tag is live on the Generation Conscious WordPress site.
   Paste the following into a header/footer plugin or Elementor custom-code block:
   ```html
