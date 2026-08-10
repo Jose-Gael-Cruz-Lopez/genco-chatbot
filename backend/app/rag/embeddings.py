@@ -16,5 +16,13 @@ def _request_embeddings(texts: list[str]) -> list[list[float]]:
     return [d.embedding for d in resp.data]
 
 
+def embed_batch(texts: list[str]) -> list[list[float]]:
+    # Validate outside the retry: a dimension mismatch is deterministic, so it
+    # should fail immediately with a named error instead of burning retries and
+    # surfacing later as a confusing Postgres/PostgREST error.
+    vectors = _request_embeddings(texts)
+    for vector in vectors:
+        if len(vector) != EMBEDDING_DIM:
+            raise ValueError(
 def embed_text(text: str) -> list[float]:
     return embed_batch([text])[0]
