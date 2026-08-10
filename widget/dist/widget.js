@@ -15,6 +15,9 @@
   var PRIMARY = cfg.primaryColor || "#FF0719"; // derived from live site 2026-08 — confirm with GC team
   var LOGO = cfg.logoUrl || "https://generationconscious.co/wp-content/uploads/2022/02/Droplet.g_Wordmark-300x106.png"; // derived from live site 2026-08 — confirm with GC team
   var KEY = "genco_session_id";
+  var FRIENDLY_ERROR = "I'm having trouble reaching the team right now — please email Info@GenerationConscious.co.";
+
+  /* localStorage can throw (Safari private mode, Chrome "Block all cookies");
 
   var css = "" +
     ".gc-launch{position:fixed;right:20px;bottom:20px;width:60px;height:60px;border-radius:50%;" +
