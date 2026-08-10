@@ -50,3 +50,34 @@ def test_lead_flow_turn_from_current_quick_reply():
 
 
 def test_lead_flow_turn_from_previous_field_request():
+    history = [
+        {"role": "user", "content": "I want to buy wholesale"},
+        {"role": "assistant",
+         "content": "Could I get your name and email? This is only used to connect you "
+                    "with the Generation Conscious team."},
+    ]
+    assert is_lead_flow_turn(history) is True
+
+
+def test_plain_qa_history_is_not_lead_flow():
+    history = [
+        {"role": "user", "content": "Do you ship to New York?"},
+        {"role": "assistant",
+         "content": "Yes — shipping is calculated at checkout with live USPS rates."},
+    ]
+    assert is_lead_flow_turn(history, current_message="what about tax?") is False
+
+
+def test_escalation_reply_is_not_a_field_request():
+    history = [{"role": "assistant", "content": (
+        "I want to make sure you get accurate information. I can help you buy sheets, set up "
+        "refill stations for your community, or connect you with our team — email "
+        "Info@GenerationConscious.co or text (516) 619-6174.")}]
+    assert is_lead_flow_turn(history) is False
+
+
+def test_greeting_is_not_a_field_request():
+    history = [{"role": "assistant", "content": (
+        "How can we support your sustainability journey? "
+        "Buy Sheets / Buy Refill Stations / Question for the team")}]
+    assert is_lead_flow_turn(history) is False
