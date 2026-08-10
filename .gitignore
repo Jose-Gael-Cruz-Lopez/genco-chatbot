@@ -4,4 +4,7 @@ __pycache__/
 venv/
 .venv/
 node_modules/
+# NOTE: no dist/ ignore — widget/dist/ is intentionally tracked (widget.js is a single
+# hand-authored file with no build step, and the Dockerfile COPYs widget/dist into the
+# image). A blanket dist/ rule would silently drop any new widget asset from deploys.
 .pytest_cache/
