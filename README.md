@@ -77,7 +77,7 @@ you paste them there), let it build, then confirm `/health` is green and
 
 You'll need temporary WP admin from Greg. Paste the embed snippet into WordPress (header/footer
 plugin or Elementor block) with `data-backend-url` pointing at the Render host. In the Render env,
-set `ALLOWED_ORIGINS` to **just** `https://generationconscious.co` (drop localhost). Then re-run a
+set `ALLOWED_ORIGINS` to **just** `https://generationconscious.co` (drop all dev origins). Then re-run a
 lead end-to-end against production and do the **mobile + desktop QA** pass.
 
 ### 6. Optional, after it's live
