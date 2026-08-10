@@ -133,7 +133,7 @@ cost-capped, and injection-declined turns are **not persisted or traced by desig
 not appear in `GET /history` or LangFuse, and they echo the client-sent `session_id` (or `""`)
 rather than minting one.
 
-**Cost cap:** temporarily set `DAILY_COST_CAP_USD=0.00001` in `.env` and restart the server,
+**Cost cap:** temporarily set `DAILY_COST_CAP_USD=0.00001` in `backend/.env` and restart the server,
 then send a chat message. Expected: the reply is the static cost-cap message ("I'm momentarily
 unavailable…") — the fallback model is NOT invoked on cost-cap, only on primary model failure.
 Restore `DAILY_COST_CAP_USD` to the real value afterward.
