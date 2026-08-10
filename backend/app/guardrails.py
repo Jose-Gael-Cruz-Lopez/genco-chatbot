@@ -102,6 +102,9 @@ class CostTracker:
 
     def record(self, usage: dict, model: str) -> None:
         self._roll()
+        rates = _RATES.get(model, _RATES["default"])
+        self._spent += ((usage.get("prompt_tokens", 0) / 1000.0) * rates["prompt"]
+                        + (usage.get("completion_tokens", 0) / 1000.0) * rates["completion"])
 
     def exceeded(self) -> bool:
         self._roll()
