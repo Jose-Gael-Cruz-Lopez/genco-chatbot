@@ -89,3 +89,15 @@ def humanize_lead_errors(errors: list[str]) -> str:
     The router surfaces it as "I still need a bit more info before I can submit
     this: <fragment>", so the fragment is a natural-language list of what's needed.
     """
+    needs: list[str] = []
+    for err in errors:
+        if err.startswith(_MISSING_PREFIX):
+            field = err.removeprefix(_MISSING_PREFIX)
+            needs.append(FIELD_LABELS.get(field, field.replace("_", " ")))
+        elif err == "invalid email format":
+            needs.append("a valid email address (the one provided doesn't look right)")
+        else:
+            needs.append(err)
+    if len(needs) == 1:
+        return needs[0]
+    return ", ".join(needs[:-1]) + " and " + needs[-1]
