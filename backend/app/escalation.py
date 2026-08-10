@@ -8,6 +8,21 @@ log = logging.getLogger(__name__)
 LOW_SIMILARITY = 0.25
 HIGH_RISK_KEYWORDS = ("refund", "complaint", "lawyer", "press", "urgent")
 
+# Widget quick-replies that start a lead flow ("Buy Sheets" is home delivery, not a lead).
+_LEAD_QUICK_REPLIES = ("buy refill stations", "question for the team")
+# Words an assistant field request mentions (the lead intents' required fields).
+_LEAD_FIELD_HINTS = ("name", "email", "phone", "organization", "sheet",
+                     "laundry room", "student", "tenant")
+
+
+def _looks_like_field_request(content: str) -> bool:
+    # A field request asks a question about one of the lead fields. Only text up to the LAST
+    # question mark counts, so trailing boilerplate ("... email Info@...") and the greeting's
+    # option list after its "?" don't false-positive.
+    text = content.lower()
+    q_end = text.rfind("?")
+    if q_end == -1:
+        return False
 
 # Server-side grounding safety net, wired into the chat flow (chat/router.py): when the top
 # retrieval similarity is below LOW_SIMILARITY (or a high-risk keyword appears, or the model
