@@ -95,6 +95,7 @@ class CostTracker:
         self._spent = 0.0
         self._day = time.gmtime().tm_yday
 
+    def _roll(self) -> None:
         today = time.gmtime().tm_yday
         if today != self._day:
             self._day, self._spent = today, 0.0
