@@ -112,7 +112,6 @@ def chat(req: ChatRequest, request: Request) -> dict:
                                output=result["content"])
         except Exception:
             logger.warning("Primary model failed; retrying with fallback model.")
-            result = llm.chat_completion(msgs, tools=[CAPTURE_LEAD_TOOL], use_fallback=True)
         reply = result["content"] or ""
         tool_calls = result.get("tool_calls") or []
         for call in tool_calls:
