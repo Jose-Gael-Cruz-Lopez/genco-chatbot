@@ -471,7 +471,6 @@ genco-chatbot/
 │   ├── knowledge_base/          # *.md source documents
 │   ├── tests/                   # pytest suite
 │   ├── requirements.txt
-│   └── Dockerfile           # built from repo root (bundles widget/dist)
 ├── widget/
 │   └── dist/
 │       └── widget.js        # embed widget (single hand-authored file)
