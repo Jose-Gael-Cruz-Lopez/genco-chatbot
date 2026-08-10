@@ -49,7 +49,6 @@ to watch:
 
 - **Check 5** — a real wholesale **and** refill lead landing in Supabase **and** the inbox **and**
   Pipedrive. This proves the actual business goal; don't wave it through.
-- **Check 3** — eyeball the printed similarity scores against the `0.25` escalation threshold.
 
 ### 3. Brand the widget
 
