@@ -39,8 +39,6 @@ _RATES: dict[str, dict[str, float]] = {
 
 
 def is_injection_attempt(text: str) -> bool:
-    t = text.lower()
-    return any(p in t for p in _INJECTION)
 
 
 def check_on_topic(text: str) -> bool:
