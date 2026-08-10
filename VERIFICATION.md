@@ -94,6 +94,8 @@ curl -s -X POST http://localhost:8000/chat \
   }' | python -m json.tool
 ```
 
+(As in check 4, `session_id` is omitted — the server mints a UUID session and returns it. For a
+multi-turn simulation, reuse the returned `session_id` on each subsequent request.)
 
 Verify all three of the following after the call:
 
