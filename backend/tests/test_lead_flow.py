@@ -61,3 +61,55 @@ def test_notify_failures_do_not_raise(sb, email, pipe):
     table = _supabase_table(sb)
     lead = escalation.capture_lead("sess", "wholesale", _valid_wholesale_fields())
     assert lead["id"] == "lead-1"   # lead persisted despite both notifications failing
+    # Both notifications failed, so neither flag may flip — the row must stay
+    # emailed=false / pushed_to_pipedrive=false so the operator can retry from Supabase.
+    table.update.assert_not_called()
+
+
+# --- #16: real-code-path validation — invalid leads must raise BEFORE any Supabase call ---
+
+@patch("app.escalation.create_lead_in_pipedrive")
+@patch("app.escalation.send_lead_notification")
+@patch("app.escalation.get_supabase")
+def test_missing_required_field_raises_without_storing(sb, email, pipe):
+    fields = _valid_wholesale_fields()
+    del fields["estimated_sheets"]
+    with pytest.raises(ValueError):
+        escalation.capture_lead("sess", "wholesale", fields)
+    sb.assert_not_called()      # no Supabase insert (client never even fetched)
+    email.assert_not_called()
+    pipe.assert_not_called()
+
+
+@patch("app.escalation.create_lead_in_pipedrive")
+@patch("app.escalation.send_lead_notification")
+@patch("app.escalation.get_supabase")
+def test_invalid_email_raises_without_storing(sb, email, pipe):
+    with pytest.raises(ValueError):
+        escalation.capture_lead(
+            "sess", "wholesale", _valid_wholesale_fields() | {"email": "not-an-email"})
+    sb.assert_not_called()
+    email.assert_not_called()
+    pipe.assert_not_called()
+
+
+@patch("app.escalation.create_lead_in_pipedrive")
+@patch("app.escalation.send_lead_notification")
+@patch("app.escalation.get_supabase")
+def test_validation_error_reprompt_is_humanized(sb, email, pipe):
+    # The ValueError message is surfaced verbatim to the end user by the router's
+    # re-prompt, so internal snake_case field names must not leak into it.
+    with pytest.raises(ValueError) as exc:
+        escalation.capture_lead("sess", "refill_station",
+            {"name": "A", "email": "a@b.com", "phone": "1", "organization": "Org"})
+    msg = str(exc.value)
+    assert "num_laundry_rooms" not in msg
+    assert "num_students" not in msg
+    assert "laundry rooms" in msg
+    assert "students" in msg
+
+
+# --- #16: flag semantics — emailed / pushed_to_pipedrive must mirror notify outcomes ---
+
+@patch("app.escalation.create_lead_in_pipedrive", return_value=True)
+@patch("app.escalation.send_lead_notification", return_value=True)
