@@ -139,12 +139,6 @@ def chat(req: ChatRequest, request: Request) -> dict:
                 raw_args = fn.get("arguments") or ""
                 args = json.loads(raw_args)
                 intent = args.pop("intent")
-                try:
-                    capture_lead(session_id, intent, args)
-                    reply = ("Thanks — I've passed this to our team. They respond within 24 hours "
-                             "(usually ~15 minutes).")
-                except ValueError as e:
-                    reply = f"I still need a bit more info before I can submit this: {e}"
         # Server-side grounding safety net: if the model isn't capturing a lead and retrieval is too
         # weak to ground an answer (top similarity below threshold, or a high-risk keyword), route to
         # the team rather than risk an ungrounded reply — regardless of what the model produced.
