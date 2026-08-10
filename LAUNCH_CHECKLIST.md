@@ -35,7 +35,6 @@ Work through these items in order before going live. Check each box once verifie
 
 ## Knowledge Base
 
-- [ ] `STORE_URL` in the KB is confirmed as the home-delivery product page:
   `https://generationconscious.co/product/laundry-detergent-sheets/`
   (already set — verify no accidental edits).
 
