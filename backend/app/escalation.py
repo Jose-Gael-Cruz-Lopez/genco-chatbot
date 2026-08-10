@@ -63,6 +63,10 @@ def should_escalate(retrieval_scores: list[float],
 def capture_lead(session_id: str, intent: str, fields: dict) -> dict:
     errors = validate_lead(intent, fields)
     if errors:
+        # Log the machine-readable errors; raise the human-readable message, because the
+        # router surfaces str(e) verbatim to the end user in its re-prompt.
+        log.info("lead validation failed (intent=%s): %s", intent, "; ".join(errors))
+        raise ValueError(humanize_lead_errors(errors))
     core = {k: fields.get(k) for k in ("name", "email", "phone", "organization")}
     extra = {k: v for k, v in fields.items()
              if k in REQUIRED_FIELDS.get(intent, []) and k not in core}
