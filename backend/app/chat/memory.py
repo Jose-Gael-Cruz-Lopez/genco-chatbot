@@ -30,6 +30,8 @@ def save_message(session_id: str, role: str, content: str) -> None:
 
 
 def get_recent_messages(session_id: str, limit: int = 10) -> list[dict]:
+    # A non-UUID id (corrupted localStorage, hand-typed curl) can never match a session row,
+    # and filtering the uuid column with it raises 22P02 — treat it as empty history.
     # Fetch the most recent `limit` messages (descending), then reverse to chronological order.
     # Ascending + limit would return the OLDEST N, so a long conversation would keep feeding the
     # model its opening and never the recent context.
