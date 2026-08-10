@@ -456,17 +456,6 @@ remains the lightweight, no-key eval; DeepEval is the deeper, judge-based gate.
 genco-chatbot/
 ├── backend/
 │   ├── app/
-│   │   ├── main.py          # FastAPI app, CORS, static widget mount
-│   │   ├── config.py        # pydantic-settings Settings class
-│   │   ├── llm.py           # OpenRouter completions + fallback
-│   │   ├── rag/             # ingest, embed, retrieve
-│   │   ├── chat/            # router, prompts, memory
-│   │   ├── leads/           # capture_lead, notify, Pipedrive
-│   │   └── guardrails/      # rate limit, cost cap, injection guard
-│   ├── knowledge_base/      # *.md source documents
-│   ├── tests/               # pytest suite
-│   ├── eval/                # run_eval.py harness
-│   ├── schema.sql           # Supabase schema (apply once)
 │   ├── requirements.txt
 │   └── Dockerfile           # built from repo root (bundles widget/dist)
 ├── widget/
