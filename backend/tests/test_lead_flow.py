@@ -113,3 +113,56 @@ def test_validation_error_reprompt_is_humanized(sb, email, pipe):
 
 @patch("app.escalation.create_lead_in_pipedrive", return_value=True)
 @patch("app.escalation.send_lead_notification", return_value=True)
+@patch("app.escalation.get_supabase")
+def test_notify_success_updates_both_flags(sb, email, pipe):
+    table = _supabase_table(sb)
+    escalation.capture_lead("sess", "wholesale", _valid_wholesale_fields())
+    assert call({"emailed": True}) in table.update.call_args_list
+    assert call({"pushed_to_pipedrive": True}) in table.update.call_args_list
+    # Every flag update targets the stored row.
+    assert table.update.return_value.eq.call_args_list == [call("id", "lead-1")] * 2
+
+
+@patch("app.escalation.create_lead_in_pipedrive", side_effect=Exception("pipedrive down"))
+@patch("app.escalation.send_lead_notification", return_value=True)
+@patch("app.escalation.get_supabase")
+def test_email_ok_pipedrive_down_updates_only_emailed(sb, email, pipe):
+    table = _supabase_table(sb)
+    lead = escalation.capture_lead("sess", "wholesale", _valid_wholesale_fields())
+    assert lead["id"] == "lead-1"   # partial notify failure still never raises
+    assert table.update.call_args_list == [call({"emailed": True})]
+
+
+# --- #22: pushed_to_pipedrive means person+deal exist; the note is best-effort ---
+
+def _pd_response(json_data: dict | None = None,
+                 raise_exc: Exception | None = None) -> MagicMock:
+    resp = MagicMock()
+    resp.json.return_value = json_data or {}
+    if raise_exc is not None:
+        resp.raise_for_status.side_effect = raise_exc
+    return resp
+
+
+@patch("app.pipedrive.httpx.Client")
+def test_pipedrive_note_failure_still_counts_as_pushed(client_cls):
+    # Person + deal created, note POST fails: must still return True — a retry
+    # driven by pushed_to_pipedrive=false would duplicate the person and deal.
+    client = client_cls.return_value.__enter__.return_value
+    client.post.side_effect = [
+        _pd_response({"data": {"id": 7}}),                      # person ok
+        _pd_response({"data": {"id": 9}}),                      # deal ok
+        _pd_response(raise_exc=RuntimeError("note POST 500")),  # note fails
+    ]
+    assert create_lead_in_pipedrive(_row()) is True
+    assert client.post.call_count == 3
+
+
+@patch("app.pipedrive.httpx.Client")
+def test_pipedrive_person_failure_propagates(client_cls):
+    # If the person POST fails nothing exists in the CRM yet, so the error must
+    # propagate and leave pushed_to_pipedrive=false for a safe retry.
+    client = client_cls.return_value.__enter__.return_value
+    client.post.return_value = _pd_response(raise_exc=RuntimeError("persons POST 500"))
+    with pytest.raises(RuntimeError):
+        create_lead_in_pipedrive(_row())
