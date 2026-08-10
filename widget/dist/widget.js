@@ -136,6 +136,14 @@
   var scrollLocked = false;
   var prevOverflow = "";
   function lockScroll() {
+    if (!scrollLocked && window.matchMedia && window.matchMedia("(max-width:480px)").matches) {
+      prevOverflow = document.body.style.overflow;
+      document.body.style.overflow = "hidden";
+      scrollLocked = true;
+    }
+  }
+  function unlockScroll() {
+    if (scrollLocked) { document.body.style.overflow = prevOverflow; scrollLocked = false; }
   }
 
   function open() {
