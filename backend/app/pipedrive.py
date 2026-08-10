@@ -34,4 +34,13 @@ def create_lead_in_pipedrive(lead: dict) -> bool:
             "person_id": person_id})
         deal.raise_for_status()
         deal_id = deal.json()["data"]["id"]
+        try:
+            notes = client.post(f"{base}/notes", params=params,
+                                json={"content": note, "deal_id": deal_id})
+            notes.raise_for_status()
+        except Exception:
+            log.exception(
+                "pipedrive note failed for deal %s (person %s); person+deal exist so the "
+                "lead still counts as pushed. Note content for manual attach: %s",
+                deal_id, person_id, note)
     return True
