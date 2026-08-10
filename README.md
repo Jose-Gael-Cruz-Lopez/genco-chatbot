@@ -135,6 +135,8 @@ python -m pytest -v
 
 ## Environment Variables
 
+All values live in `backend/.env` (git-ignored). Set the same variables in the Render (or
+Railway/Fly) dashboard as service environment variables.
 
 | Variable | Description | Where to get it |
 |---|---|---|
