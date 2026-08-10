@@ -118,6 +118,10 @@
     fetch(BACKEND_URL + "/chat", {
       method: "POST", headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ session_id: sessionId, message: text })
+    }).then(function (r) {
+      if (!r.ok) { throw new Error("HTTP " + r.status); }
+      return r.json();
+    }).then(function (data) {
       typing.remove();
       if (data.session_id) { sessionId = data.session_id; localStorage.setItem(KEY, sessionId); }
       bubble("bot", data.reply || "");
