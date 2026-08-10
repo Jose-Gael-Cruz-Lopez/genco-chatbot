@@ -1,4 +1,3 @@
-from app.escalation import should_escalate
 
 
 def test_no_scores_escalates():
