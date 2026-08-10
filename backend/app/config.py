@@ -5,6 +5,9 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 # Anchor the env file to backend/.env (this file lives at backend/app/config.py) so
 # settings load identically from any CWD — repo root, backend/, or elsewhere. A bare
+# ".env" would resolve against the current working directory and silently load nothing
+# when commands run from the repo root.
+_ENV_FILE = Path(__file__).resolve().parent.parent / ".env"
 
 
 class Settings(BaseSettings):
