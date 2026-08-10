@@ -121,7 +121,6 @@ def trace_turn(name: str, **metadata: Any) -> Iterator[TurnTrace]:
     trace = lf.trace(name=name, metadata=metadata) if lf else None
     turn = TurnTrace(trace, dict(metadata))
     try:
-        yield span
     finally:
         if lf:
             lf.flush()
