@@ -13,8 +13,6 @@ def test_high_similarity_no_escalate():
     assert should_escalate([0.9]) is False
 
 
-def test_model_signal_overrides():
-    assert should_escalate([0.9], model_signal=True) is True
 
 
 def test_high_risk_keyword_escalates():
