@@ -19,6 +19,7 @@ def get_or_create_session(session_id: str | None) -> str:
         existing = sb.table("chat_sessions").select("id").eq("id", session_id).execute()
         if existing.data:
             return session_id
+    # Absent, non-UUID, or unknown id — mint a fresh session (the function's contract).
     created = sb.table("chat_sessions").insert({}).execute()
     return created.data[0]["id"]
 
