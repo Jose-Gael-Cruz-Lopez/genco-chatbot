@@ -38,6 +38,18 @@ Work through these items in order before going live. Check each box once verifie
 - [ ] The home-delivery URL hardcoded in the KB (`backend/knowledge_base/products_and_purchasing.md`)
   and in the system prompt (`backend/app/chat/prompts.py`) is confirmed as the product page:
   `https://generationconscious.co/product/laundry-detergent-sheets/`
+  (already set — verify no accidental edits; there is no `STORE_URL` variable, the URL is plain
+  prose in those two files).
+- [ ] GC team has approved the Mission copy in `backend/knowledge_base/learn_more.md` (drawn from
+  `https://generationconscious.co/about/`, fetched 2026-08-10). If the wording changes, edit the
+  file and re-run `python -m app.rag.ingest` so the live KB picks it up.
+- [ ] Learn More links verified by a **human click-through in a logged-out browser** — both are
+  hardcoded in `backend/knowledge_base/learn_more.md`:
+  - the Lifecycle Assessment Google Drive link renders the PDF (sharing must be
+    "anyone with the link"),
+  - the Instagram refill-station post displays the refill station.
+  Do not trust a `curl` HTTP 200 for either: Drive returns 200 on its access-denied page and
+  Instagram can return a 200 shell for deleted posts.
 
 ---
 
