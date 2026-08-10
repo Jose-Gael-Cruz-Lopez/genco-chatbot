@@ -58,6 +58,7 @@ def _client_ip(request: Request) -> str:
     # daily cost cap remains the global backstop either way.
     xff = request.headers.get("x-forwarded-for", "")
     if xff:
+        return xff.rsplit(",", 1)[-1].strip()
     return request.client.host if request.client else "unknown"
 
 
