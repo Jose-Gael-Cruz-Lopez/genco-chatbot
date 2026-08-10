@@ -130,6 +130,14 @@ def chat(req: ChatRequest, request: Request) -> dict:
         reply = result["content"] or ""
         tool_calls = result.get("tool_calls") or []
         for call in tool_calls:
+            # The whole per-call block is guarded: a malformed model emission or an unexpected
+            # storage failure must never 500 the turn (leads must never be lost to a crash).
+            try:
+                fn = call.get("function") or {}
+                if fn.get("name") != "capture_lead":
+                    continue
+                raw_args = fn.get("arguments") or ""
+                args = json.loads(raw_args)
                 intent = args.pop("intent")
                 try:
                     capture_lead(session_id, intent, args)
