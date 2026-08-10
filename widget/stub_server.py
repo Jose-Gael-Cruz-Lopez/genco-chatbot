@@ -68,3 +68,73 @@ class StubHandler(BaseHTTPRequestHandler):
     def _send_json(self, body: dict[str, object], status: int = 200) -> None:
         data = json.dumps(body).encode()
         self.send_response(status)
+        self.send_header("Content-Type", "application/json")
+        self.send_header("Content-Length", str(len(data)))
+        self._send_cors_headers()
+        self.end_headers()
+        self.wfile.write(data)
+
+    def _send_cors_headers(self) -> None:
+        self.send_header("Access-Control-Allow-Origin", "*")
+        self.send_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
+        self.send_header("Access-Control-Allow-Headers", "Content-Type")
+
+    def do_OPTIONS(self) -> None:  # noqa: N802 (http.server API)
+        self.send_response(204)
+        self._send_cors_headers()
+        self.end_headers()
+
+    def do_GET(self) -> None:  # noqa: N802
+        parsed = urlparse(self.path)
+        if parsed.path != "/history":
+            self._send_json({"detail": "not found"}, status=404)
+            return
+        session_id = (parse_qs(parsed.query).get("session_id") or [""])[0]
+        self._send_json({"session_id": session_id, "messages": _HISTORY.get(session_id, [])})
+
+    def do_POST(self) -> None:  # noqa: N802
+        parsed = urlparse(self.path)
+        if parsed.path != "/chat":
+            self._send_json({"detail": "not found"}, status=404)
+            return
+        length = int(self.headers.get("Content-Length") or 0)
+        try:
+            payload = json.loads(self.rfile.read(length) or b"{}")
+        except json.JSONDecodeError:
+            payload = {}
+        message = str(payload.get("message") or "")
+        if message.strip().lower() == "fail":
+            self._send_json({"detail": "stubbed internal error"}, status=500)
+            return
+        session_id = str(payload.get("session_id") or "stub-session-1")
+        reply = _reply_for(message)
+        now = datetime.now(UTC).isoformat()
+        history = _HISTORY.setdefault(session_id, [])
+        history.append({"role": "user", "content": message, "created_at": now})
+        if reply:
+            history.append({"role": "assistant", "content": reply, "created_at": now})
+        self._send_json(
+            {"session_id": session_id, "reply": reply, "retrieval_scores": [0.91, 0.84, 0.42]}
+        )
+
+    def log_message(self, format: str, *args: object) -> None:  # noqa: A002 (http.server API)
+        sys.stderr.write("[stub] " + format % args + "\n")
+
+
+def main() -> None:
+    port = int(sys.argv[1]) if len(sys.argv) > 1 else 8000
+    server = ThreadingHTTPServer(("127.0.0.1", port), StubHandler)
+    print(
+        f"Genco stub backend on http://localhost:{port} — POST /chat, GET /history "
+        "(Ctrl-C to stop)"
+    )
+    try:
+        server.serve_forever()
+    except KeyboardInterrupt:
+        pass
+    finally:
+        server.server_close()
+
+
+if __name__ == "__main__":
+    main()
