@@ -30,9 +30,6 @@ def _supabase_table(sb) -> MagicMock:
 @patch("app.escalation.send_lead_notification", return_value=True)
 @patch("app.escalation.get_supabase")
 def test_capture_stores_before_notifying(sb, email, pipe):
-    table = MagicMock()
-    table.insert.return_value.execute.return_value = MagicMock(data=[_row()])
-    sb.return_value.table.return_value = table
 
     # Attach mocks to parent BEFORE the call so all calls are recorded in order.
     parent = Mock()
