@@ -91,6 +91,7 @@ def chat(req: ChatRequest, request: Request) -> dict:
         return {"session_id": echo_id,
                 "reply": "I can only help with Generation Conscious products and orders. How can I help with that?",
                 "retrieval_scores": []}
+    session_id = memory.get_or_create_session(req.session_id)
     history = memory.get_recent_messages(session_id, limit=10)
     memory.save_message(session_id, "user", req.message)
     hits = retrieve(req.message, k=5)
