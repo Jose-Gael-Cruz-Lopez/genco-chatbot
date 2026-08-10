@@ -172,6 +172,7 @@ def main(argv: list[str] | None = None) -> int:
     mode = "mock" if mock else "live"
     print(f"\n{passed}/{total} passed ({mode}) | avg latency {sum(lat)/len(lat):.2f}s | "
           f"avg score {sum(sc)/len(sc) if sc else 0:.3f}")
+    return 0 if passed == total else 1
 
 
 if __name__ == "__main__":
