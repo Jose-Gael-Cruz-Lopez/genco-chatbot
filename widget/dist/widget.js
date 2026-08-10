@@ -4,6 +4,11 @@
    * team before go-live (README runbook step 3):
    *   PRIMARY  #FF0719  = Elementor global color "f55a23f" (kit-5), the red
    *            used for nav/buttons site-wide; identical to the wordmark
+   *            PNG's palette color.
+   *   LOGO     the header wordmark the live homepage ships (300px variant).
+   * Both can be overridden per-embed via window.GENCO_CONFIG
+   * ({backendUrl, primaryColor, logoUrl}) or data-backend-url on the tag.
+   * ──────────────────────────────────────────────────────────────────────── */
   var cfg = window.GENCO_CONFIG || {};
   var script = document.currentScript;
   var BACKEND_URL = cfg.backendUrl || (script && script.dataset.backendUrl) || "http://localhost:8000";
