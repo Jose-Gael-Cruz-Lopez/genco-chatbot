@@ -92,13 +92,6 @@ def load_cases() -> list[dict]:
     for n, line in enumerate(CASES.read_text().splitlines(), start=1):
         if not line.strip():
             continue
-        case = json.loads(line); total += 1
-        body = json.dumps({"message": case["question"]}).encode()
-        req = urllib.request.Request(f"{BACKEND}/chat", body,
-                                     {"Content-Type": "application/json"})
-        t0 = time.time()
-        with urllib.request.urlopen(req) as resp:
-            data = json.loads(resp.read())
         lat.append(time.time() - t0)
         scores = data.get("retrieval_scores", []); sc += scores
         got = classify(data.get("reply", ""), scores)
