@@ -52,12 +52,6 @@ def ingest_all() -> int:
         return 0
     # Embed BEFORE any database write — if this raises, the old KB keeps serving.
     vectors = embed_batch([c["content"] for c in all_chunks])
-    rows = [{
-        "content": c["content"],
-        "content_hash": hashlib.sha256(c["content"].encode()).hexdigest(),
-        "embedding": v,
-        "metadata": c["metadata"],
-    } for c, v in zip(all_chunks, vectors)]
     sb.table("kb_documents").upsert(rows, on_conflict="content_hash").execute()
     return len(rows)
 
