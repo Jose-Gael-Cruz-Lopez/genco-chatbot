@@ -66,6 +66,8 @@ CAPTURE_LEAD_TOOL = {
 
 
 def validate_lead(intent: str, fields: dict) -> list[str]:
+    """Machine-readable validation errors (stable strings, used in logs and tests).
+
     errors: list[str] = []
     for f in REQUIRED_FIELDS.get(intent, []):
         if fields.get(f) in (None, ""):
