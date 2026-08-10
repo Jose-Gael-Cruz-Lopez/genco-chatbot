@@ -161,7 +161,6 @@ def chat(req: ChatRequest, request: Request) -> dict:
         # Server-side grounding safety net: if the model isn't capturing a lead and retrieval is too
         # weak to ground an answer (top similarity below threshold, or a high-risk keyword), route to
         # the team rather than risk an ungrounded reply — regardless of what the model produced.
-        if not tool_calls and should_escalate(scores, text=req.message):
             reply = _ESCALATION_REPLY
         span.update(model=result["model"], usage=result["usage"], reply=reply)
         _cost.record(result["usage"], result["model"])
