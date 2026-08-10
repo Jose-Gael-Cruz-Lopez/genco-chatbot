@@ -43,8 +43,6 @@ set -a; source .env; set +a
 python -m pytest tests/test_retrieval.py -v
 ```
 
-Expected: all assertions pass with cosine-similarity scores > 0.2. A score below 0.2 on any
-fixture query indicates the embeddings or the `match_documents` threshold need tuning.
 
 ---
 
