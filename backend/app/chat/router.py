@@ -29,6 +29,16 @@ _ESCALATION_REPLY = (
     "or text (516) 619-6174."
 )
 
+# Re-prompt when the model emits a capture_lead call the server can't parse (malformed JSON,
+# missing intent) — ask again instead of crashing the turn.
+_TOOL_REPROMPT_REPLY = (
+    "Sorry — I didn't quite catch all of that. Could you share those details once more?"
+)
+
+# Offered when storing a fully-collected lead fails unexpectedly: the human path must always
+# be available so the lead is never silently lost.
+_LEAD_FALLBACK_REPLY = (
+    "I wasn't able to submit your details just now, but our team still wants to hear from you — "
 
 def _client_ip(request: Request) -> str:
     # On Render (and most proxies) the real client is the first hop in X-Forwarded-For.
