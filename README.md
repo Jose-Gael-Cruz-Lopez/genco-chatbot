@@ -333,6 +333,16 @@ Open [cloud.langfuse.com](https://cloud.langfuse.com) and navigate to your proje
   per-1K-token USD rates in `_RATES` (`backend/app/guardrails.py`), deliberately set on the high
   side so the cap trips early rather than late. If you change `OPENROUTER_MODEL` or
   `OPENROUTER_MODEL_FALLBACK`, add the new model's prices to `_RATES` — unknown models are billed
+  at the `default` (sonnet-class) rate, which never undercounts but will overcount cheap models
+  and trip the cap sooner than real spend warrants.
+- **Embedding spend is not counted**: the tracker only meters OpenRouter chat completions. Query
+  embeddings billed to `EMBEDDING_API_KEY` (fractions of a cent per turn with
+  `text-embedding-3-small`) sit outside the cap — watch them on the OpenAI billing page.
+- **Guard-blocked turns are stateless by design**: requests stopped by the rate limit, the daily
+  cost cap, or the injection guard get their static reply without touching Supabase or LangFuse —
+  no `chat_messages` row, no trace. Those exchanges therefore do not reappear via `GET /history`
+  after a page reload. This is deliberate: the gates run before any DB access so abusive traffic
+  costs nothing downstream.
 - To reduce cost per turn, switch `OPENROUTER_MODEL` to a cheaper model (e.g. `openai/gpt-4o-mini`).
   The fallback model is already cheap by default.
 - Monitor actual spend in LangFuse and in your OpenRouter billing dashboard.
