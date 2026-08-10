@@ -21,6 +21,21 @@ from collections import defaultdict, deque
 _INJECTION = ("ignore previous", "ignore all previous", "system prompt",
               "reveal your", "disregard", "you are now", "act as",
               "ignore all", "override", "forget everything", "new instructions")
+# Match phrases only at word boundaries: "act as a pirate" trips the guard, but
+# "impact assessment" (which contains "act as" as a raw substring) does not.
+_INJECTION_RE = re.compile(
+    r"\b(?:" + "|".join(re.escape(p) for p in _INJECTION) + r")\b")
+
+# USD per 1K tokens, split prompt/completion — OpenRouter list prices for the
+# configured models (high side, so the cap trips early rather than late).
+# Add an entry whenever OPENROUTER_MODEL or OPENROUTER_MODEL_FALLBACK changes.
+# Unknown models fall back to "default", which assumes sonnet-class pricing
+# (the most expensive configured model) so an unlisted model never undercounts.
+_RATES: dict[str, dict[str, float]] = {
+    "anthropic/claude-3.5-sonnet": {"prompt": 0.003, "completion": 0.015},
+    "openai/gpt-4o-mini": {"prompt": 0.00015, "completion": 0.0006},
+    "default": {"prompt": 0.003, "completion": 0.015},
+}
 
 
 def is_injection_attempt(text: str) -> bool:
