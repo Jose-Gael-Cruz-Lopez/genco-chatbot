@@ -12,6 +12,8 @@
   var cfg = window.GENCO_CONFIG || {};
   var script = document.currentScript;
   var BACKEND_URL = cfg.backendUrl || (script && script.dataset.backendUrl) || "http://localhost:8000";
+  var PRIMARY = cfg.primaryColor || "#FF0719"; // derived from live site 2026-08 — confirm with GC team
+  var LOGO = cfg.logoUrl || "https://generationconscious.co/wp-content/uploads/2022/02/Droplet.g_Wordmark-300x106.png"; // derived from live site 2026-08 — confirm with GC team
   var KEY = "genco_session_id";
 
   var css = "" +
