@@ -6,6 +6,15 @@ uvicorn worker or extra instance keeps its own independent copy — so the "dail
 cost cap is per-process, not global, and effectively multiplies by the
 worker/instance count. Pin the deploy to a single worker, or swap in a shared
 store (Redis, or a Supabase row keyed by UTC date) before scaling out.
+
+On-topic enforcement is deliberately NOT implemented here: it is delegated to
+the system prompt's "answer only from context" rule plus the retrieval-score
+escalation threshold (see app/escalation.py). A former always-True
+check_on_topic() stub was removed because it was dead code — never called from
+any request path — and tightening it would have silently done nothing.
+"""
+
+import re
 import time
 from collections import defaultdict, deque
 
