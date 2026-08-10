@@ -69,7 +69,6 @@ class ChatRequest(BaseModel):
 
 @router.post("/chat")
 def chat(req: ChatRequest, request: Request) -> dict:
-    session_id = memory.get_or_create_session(req.session_id)
     # Rate-limit by client IP, not the browser-supplied session_id (which a client can rotate/omit
     # to mint a fresh bucket every request).
     if not _rate_limiter.allow(_client_ip(request)):
