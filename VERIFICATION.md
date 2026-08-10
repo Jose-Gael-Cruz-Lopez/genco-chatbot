@@ -67,7 +67,7 @@ Send a grounded question (omit `session_id` on the first turn — it is optional
 ```bash
 curl -s -X POST http://localhost:8000/chat \
   -H "Content-Type: application/json" \
-  -d '{"session_id":"verify-001","message":"Do you ship to New York?"}' | python -m json.tool
+  -d '{"message":"Do you ship to New York?"}' | python -m json.tool
 ```
 
 Expected: `reply` references the KB shipping fact (USPS live rates; NY sales tax). The
