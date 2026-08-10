@@ -20,6 +20,17 @@ FIELD_LABELS: dict[str, str] = {
     "num_laundry_rooms": "the number of laundry rooms",
     "num_students": "the number of students or tenants",
     "question": "your question for the team",
+}
+
+
+def _tool_description() -> str:
+    per_intent = "; ".join(
+        f"{intent}: {', '.join(fields)}" for intent, fields in REQUIRED_FIELDS.items())
+    return ("Record a lead once ALL required fields for the intent are collected. "
+            f"Required fields per intent — {per_intent}. "
+            "Keep asking the user for the missing fields; do not call this tool early.")
+
+
 CAPTURE_LEAD_TOOL = {
     "type": "function",
     "function": {
