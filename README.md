@@ -377,6 +377,12 @@ If either notification fails, the Supabase row persists with `emailed=false` or
 
 ---
 
+## Fast-Follow: Token Streaming
+
+v1 is deliberately **non-streaming**: `POST /chat` returns the full reply as a single JSON body.
+The approved design (docs/superpowers/specs/2026-06-18-genco-chatbot-design.md, "Token streaming")
+shipped it this way and flags **SSE streaming of `/chat` replies as the first fast-follow
+enhancement** — perceived latency is the widget's weakest point, and streaming tokens as they
 ## Optional ML Enhancements
 
 Two opt-in enhancements live behind `backend/requirements-ml.txt`. They are **not** installed by
