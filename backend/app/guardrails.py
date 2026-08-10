@@ -53,6 +53,8 @@ def consent_note() -> str:
 class RateLimiter:
     def __init__(self, per_minute: int, max_keys: int = 10_000):
         self.per_minute = per_minute
+        self.max_keys = max_keys
+        self._hits: dict[str, deque[float]] = defaultdict(deque)
 
     def allow(self, key: str) -> bool:
         now = time.time()
