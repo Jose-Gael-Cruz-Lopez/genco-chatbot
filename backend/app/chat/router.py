@@ -76,6 +76,7 @@ def chat(req: ChatRequest, request: Request) -> dict:
     # Rate-limit by client IP, not the browser-supplied session_id (which a client can rotate/omit
     # to mint a fresh bucket every request).
     if not _rate_limiter.allow(_client_ip(request)):
+        return {"session_id": echo_id,
                 "reply": "You're sending messages quickly — give me a moment and try again.",
                 "retrieval_scores": []}
     if _cost.exceeded():
