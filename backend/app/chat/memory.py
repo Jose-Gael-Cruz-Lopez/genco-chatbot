@@ -15,7 +15,6 @@ def _is_uuid(value: str | None) -> bool:
 
 def get_or_create_session(session_id: str | None) -> str:
     sb = get_supabase()
-    if session_id:
         existing = sb.table("chat_sessions").select("id").eq("id", session_id).execute()
         if existing.data:
             return session_id
