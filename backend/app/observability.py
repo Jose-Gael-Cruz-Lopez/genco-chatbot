@@ -1,3 +1,9 @@
+"""LangFuse tracing (langfuse 2.x) for the chat pipeline.
+
+Every chat turn emits one trace spanning retrieve -> generate -> respond:
+a `retrieve` span around retrieval, a `generate` generation observation
+carrying model + usage (so the LangFuse cost dashboard picks it up), and a
+`respond` event with the final reply. Escalated turns are tagged `escalation`.
 from contextlib import contextmanager
 from app.config import get_settings
 
