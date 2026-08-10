@@ -182,7 +182,7 @@ The build context is the **repository root** (not `backend/`) so `widget/dist/` 
 ```bash
 # from the repo root
 docker build -f backend/Dockerfile -t genco-chatbot .
-docker run -p 8000:8000 --env-file .env genco-chatbot
+docker run -p 8000:8000 --env-file backend/.env genco-chatbot
 ```
 
 ---
