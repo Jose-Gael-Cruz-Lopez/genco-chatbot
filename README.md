@@ -234,7 +234,7 @@ Build manually from the repo root for local testing:
 ```bash
 # from repo root, not backend/
 docker build -f backend/Dockerfile -t genco-chatbot .
-docker run -p 8000:8000 --env-file .env genco-chatbot
+docker run -p 8000:8000 --env-file backend/.env genco-chatbot
 ```
 
 `widget/dist/widget.js` is committed to the repo (it's a single hand-authored file, no build
