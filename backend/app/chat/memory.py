@@ -42,3 +42,27 @@ def get_recent_messages(session_id: str, limit: int = 10) -> list[dict]:
             .eq("session_id", session_id)
             .order("created_at", desc=True).limit(limit).execute())
     return list(reversed(resp.data or []))
+
+
+def get_flow_state(session_id: str) -> dict | None:
+    """The session's position in the FAQ state machine, or None when idle.
+
+    A corrupt/non-dict value reads as None so a bad row can never trap a visitor
+    in a broken flow — the turn is then answered as a fresh question.
+    """
+    if not _is_uuid(session_id):
+        return None
+    resp = (get_supabase().table("chat_sessions")
+            .select("flow_state").eq("id", session_id).execute())
+    if not resp.data:
+        return None
+    state = resp.data[0].get("flow_state")
+    return state if isinstance(state, dict) else None
+
+
+def set_flow_state(session_id: str, state: dict | None) -> None:
+    """Persist the next flow state; None resets the session to idle."""
+    if not _is_uuid(session_id):
+        return
+    (get_supabase().table("chat_sessions")
+     .update({"flow_state": state}).eq("id", session_id).execute())
