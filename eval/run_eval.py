@@ -16,7 +16,14 @@ Usage:
                   answered with a canned reply shaped like the real backend's
                   reply for its category, so test_set.jsonl parsing, classify(),
                   and the pass/fail + latency + score reporting run end-to-end
-                  against mocks. Setting MOCK=1 in the environment does the same.
+                  against mocks. FAQ cases are answered from the real
+                  backend/knowledge_base/ markdown instead, so their keywords are
+                  checked against the KB the bot actually serves. Setting MOCK=1
+                  in the environment does the same.
+
+A run has two sections: the routing/grounding cases in eval/test_set.jsonl, scored
+by classify(), and the FAQ_CASES fixtures below, which check that a BOT_MODE=faq
+answer still carries the knowledge base's own words.
 
 Exit status: 0 when every case passes, 1 otherwise.
 """
@@ -24,9 +31,11 @@ Exit status: 0 when every case passes, 1 otherwise.
 import argparse
 import json
 import os
+import re
 import sys
 import time
 import urllib.request
+from functools import lru_cache
 from pathlib import Path
 
 CASES = Path(__file__).parent / "test_set.jsonl"
@@ -71,6 +80,40 @@ MOCK_SCORES: dict[str, list[float]] = {
     "decline": [],              # guard paths return no retrieval scores
 }
 
+# ── FAQ mode (BOT_MODE=faq) ───────────────────────────────────────────────────────
+KB_DIR = Path(__file__).resolve().parent.parent / "backend" / "knowledge_base"
+
+# chat/flows.py's no-match reply, verbatim.
+FAQ_NO_MATCH_REPLY = (
+    "I couldn't find that in our FAQ — but our team can answer it personally."
+)
+
+# FAQ mode answers with a KB chunk word for word, so there is no category to
+# classify: a case is a question plus the words its answer must carry. "escalates"
+# marks the question the KB deliberately cannot answer, where the flow offers the
+# team instead of an answer.
+FAQ_CASES: list[dict] = [
+    {"question": "how much is shipping",
+     "keywords": ["USPS", "checkout"],
+     "notes": "live USPS rates, exact amount only at checkout"},
+    {"question": "do you charge sales tax",
+     "keywords": ["New York", "tax"],
+     "notes": "sales tax applies to New York orders only"},
+    {"question": "how do I buy sheets",
+     "keywords": ["product/laundry-detergent-sheets"],
+     "notes": "home-delivery product page — not /checkout/ and not /shop/"},
+    {"question": "do you do bulk orders",
+     "keywords": ["wholesale", "larger quantities"],
+     "notes": "wholesale lead-capture flow"},
+    {"question": "how do refill stations work",
+     "keywords": ["refill stations", "campuses"],
+     "notes": "gated campus and building refill stations"},
+    {"question": "do you sell dog food",
+     "keywords": ["couldn't find"],
+     "escalates": True,
+     "notes": "no KB match — the flow offers to send the question to the team"},
+]
+
 
 def classify(reply: str, scores: list) -> str:
     r = reply.lower()
@@ -85,6 +128,39 @@ def classify(reply: str, scores: list) -> str:
     if any(w in r for w in ("name", "email", "phone", "organization")):
         return "collect_lead_fields"
     return "answer_from_kb"
+
+
+@lru_cache(maxsize=1)
+def kb_sections() -> tuple[str, ...]:
+    """Every KB section, split the way rag/ingest.py chunks the markdown files."""
+    sections: list[str] = []
+    for md_file in sorted(KB_DIR.glob("*.md")):
+        pieces = re.split(r"\n(?=#{1,6}\s)", md_file.read_text().strip())
+        sections += [piece.strip() for piece in pieces if piece.strip()]
+    return tuple(sections)
+
+
+def faq_missing(reply: str, keywords: list[str]) -> list[str]:
+    """The keywords a reply failed to carry, case-insensitively; empty = pass."""
+    low = reply.lower()
+    return [k for k in keywords if k.lower() not in low]
+
+
+def faq_mock_reply(case: dict) -> str:
+    """The KB text FAQ mode would answer with, read from the real knowledge base.
+
+    Answering --mock out of knowledge_base/ instead of a canned string is what
+    makes the offline run worth running: a case passes only while the KB the bot
+    actually serves still contains the words the case asserts on.
+    """
+    if case.get("escalates"):
+        return FAQ_NO_MATCH_REPLY
+    for section in kb_sections():
+        if not faq_missing(section, case["keywords"]):
+            return section
+    # Deliberately keyword-free text: echoing the keywords back here would make
+    # the case match its own error message and pass.
+    return "[no KB section carries every keyword for this case]"
 
 
 def load_cases() -> list[dict]:
@@ -110,6 +186,27 @@ def ask_backend(backend: str, question: str) -> dict:
         return json.loads(resp.read())
 
 
+def ask_paced(backend: str, question: str, interval: float,
+              next_start: float) -> tuple[dict, float, float]:
+    """One live request, honouring the pacing window.
+
+    Returns (response, request start time, earliest start for the next case).
+    """
+    wait = next_start - time.time()
+    if wait > 0:
+        time.sleep(wait)
+    t0 = time.time()
+    data = ask_backend(backend, question)
+    if THROTTLE_SNIPPET in data.get("reply", ""):
+        # Rate limit tripped anyway (e.g. --rps 0, or another client sharing the
+        # IP): wait out the rolling 60s window, then retry this case once.
+        print("[throttled] rate limit hit — sleeping 61s, then retrying this case")
+        time.sleep(61)
+        t0 = time.time()
+        data = ask_backend(backend, question)
+    return data, t0, t0 + interval
+
+
 def ask_mock(case: dict) -> dict:
     expected = case["expected"]
     return {"session_id": "mock-session", "reply": MOCK_REPLIES[expected],
@@ -130,6 +227,35 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
     return parser.parse_args(argv)
 
 
+def run_faq_cases(backend: str, mock: bool, interval: float,
+                  next_start: float) -> int:
+    """Score and print the FAQ-mode fixtures; returns how many passed.
+
+    FAQ match ranks are ts_rank values, not cosine similarities, so they are kept
+    out of the routing section's average score rather than mixed into it.
+    """
+    print(f"\nFAQ mode ({len(FAQ_CASES)} cases):")
+    passed = 0
+    lat: list[float] = []
+    for case in FAQ_CASES:
+        if mock:
+            t0 = time.time()
+            reply = faq_mock_reply(case)
+        else:
+            data, t0, next_start = ask_paced(
+                backend, case["question"], interval, next_start)
+            reply = data.get("reply", "")
+        lat.append(time.time() - t0)
+        missing = faq_missing(reply, case["keywords"])
+        passed += not missing
+        print(f"[{'FAIL' if missing else 'PASS'}] {case['question'][:40]!r} "
+              f"keywords={'; '.join(case['keywords'])}"
+              + (f" | missing={'; '.join(missing)}" if missing else ""))
+    print(f"\n{passed}/{len(FAQ_CASES)} FAQ cases passed | "
+          f"avg latency {sum(lat)/len(lat):.2f}s")
+    return passed
+
+
 def main(argv: list[str] | None = None) -> int:
     args = parse_args(sys.argv[1:] if argv is None else argv)
     mock = args.mock or os.environ.get("MOCK") == "1"
@@ -145,20 +271,8 @@ def main(argv: list[str] | None = None) -> int:
             t0 = time.time()
             data = ask_mock(case)
         else:
-            wait = next_start - time.time()
-            if wait > 0:
-                time.sleep(wait)
-            t0 = time.time()
-            next_start = t0 + interval
-            data = ask_backend(args.backend, case["question"])
-            if THROTTLE_SNIPPET in data.get("reply", ""):
-                # Rate limit tripped anyway (e.g. --rps 0, or another client sharing the
-                # IP): wait out the rolling 60s window, then retry this case once.
-                print("[throttled] rate limit hit — sleeping 61s, then retrying this case")
-                time.sleep(61)
-                t0 = time.time()
-                next_start = t0 + interval
-                data = ask_backend(args.backend, case["question"])
+            data, t0, next_start = ask_paced(
+                args.backend, case["question"], interval, next_start)
         lat.append(time.time() - t0)
         scores = data.get("retrieval_scores", [])
         sc += scores
@@ -172,7 +286,9 @@ def main(argv: list[str] | None = None) -> int:
     mode = "mock" if mock else "live"
     print(f"\n{passed}/{total} passed ({mode}) | avg latency {sum(lat)/len(lat):.2f}s | "
           f"avg score {sum(sc)/len(sc) if sc else 0:.3f}")
-    return 0 if passed == total else 1
+
+    faq_passed = run_faq_cases(args.backend, mock, interval, next_start)
+    return 0 if passed == total and faq_passed == len(FAQ_CASES) else 1
 
 
 if __name__ == "__main__":
