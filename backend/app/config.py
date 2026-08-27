@@ -33,6 +33,11 @@ class Settings(BaseSettings):
     ESCALATION_EMAIL: str = "Info@GenerationConscious.co"
     PIPEDRIVE_API_TOKEN: str = ""
     PIPEDRIVE_DOMAIN: str = ""
+    # Agent portal (/agent). BOTH must be set for the portal to work; with either
+    # blank every /agent route refuses service, so an unconfigured deploy fails
+    # closed rather than exposing visitor questions to the internet.
+    AGENT_PASSWORD: str = ""
+    AGENT_SESSION_SECRET: str = ""
     # Dev default — must stay identical to .env.example and the README env table.
     # Includes both spellings of the widget test origin (localhost and 127.0.0.1 are
     # DIFFERENT CORS origins). Production overrides this with exactly
