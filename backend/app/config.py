@@ -13,6 +13,11 @@ _ENV_FILE = Path(__file__).resolve().parent.parent / ".env"
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=_ENV_FILE, extra="ignore")
 
+    # "faq" (default) = zero-AI Postgres full-text matching, verbatim KB answers.
+    # "generative" = the original OpenRouter RAG pipeline, retained behind this flag.
+    # FAQ mode never reads the OPENROUTER_*/EMBEDDING_*/LANGFUSE_* settings below.
+    BOT_MODE: str = "faq"
+
     OPENROUTER_API_KEY: str = ""
     OPENROUTER_MODEL: str = "anthropic/claude-3.5-sonnet"
     OPENROUTER_MODEL_FALLBACK: str = "openai/gpt-4o-mini"
