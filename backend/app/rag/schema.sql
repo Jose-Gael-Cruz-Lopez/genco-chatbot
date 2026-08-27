@@ -57,3 +57,43 @@ create table if not exists leads (
   emailed boolean default false,
   pushed_to_pipedrive boolean default false
 );
+
+-- ── FAQ-match mode (BOT_MODE=faq) ─────────────────────────────────────────
+-- In FAQ mode chunks are stored with no embedding, so the column must be nullable.
+alter table kb_documents alter column embedding drop not null;
+
+-- Generated tsvector + GIN index: the zero-AI matching path.
+alter table kb_documents add column if not exists content_tsv tsvector
+  generated always as (to_tsvector('english', content)) stored;
+create index if not exists kb_documents_content_tsv_idx
+  on kb_documents using gin (content_tsv);
+
+-- Mirrors match_documents' return shape (score column named `similarity`) so the
+-- Python retrieval helpers and the frozen retrieval_scores contract stay identical.
+create or replace function match_documents_fts(
+  query_text text,
+  match_count int default 5
+)
+returns table (id uuid, content text, metadata jsonb, similarity float)
+language sql stable as $$
+  select id, content, metadata,
+         ts_rank(content_tsv, websearch_to_tsquery('english', query_text))::float
+           as similarity
+  from kb_documents
+  where content_tsv @@ websearch_to_tsquery('english', query_text)
+  order by ts_rank(content_tsv, websearch_to_tsquery('english', query_text)) desc
+  limit match_count;
+$$;
+
+-- Per-session position in the deterministic FAQ state machine (null = idle).
+alter table chat_sessions add column if not exists flow_state jsonb;
+
+-- The FAQ backlog: one row per feedback event. No PII — question text and rank only.
+create table if not exists faq_misses (
+  id uuid primary key default gen_random_uuid(),
+  question text not null,
+  top_rank float,
+  answered boolean default false,
+  created_at timestamptz default now()
+);
+create index if not exists faq_misses_created_idx on faq_misses(created_at desc);
