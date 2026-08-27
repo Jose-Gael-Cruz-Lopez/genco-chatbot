@@ -8,6 +8,8 @@ COPY backend/ /app
 # Bundle the widget so the backend can serve it at /widget/widget.js (the WordPress embed target).
 # main.py resolves the widget dir to <repo-root>/widget/dist; in the image that is /widget/dist.
 COPY widget/dist /widget/dist
+# Bundle the agent portal so the backend can serve it at /agent.
+COPY portal/dist /portal/dist
 EXPOSE 8000
 HEALTHCHECK CMD python -c "import urllib.request;urllib.request.urlopen('http://localhost:8000/health')"
 CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
