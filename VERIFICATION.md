@@ -10,12 +10,12 @@ Each check below is labelled with the mode(s) it applies to.
 
 | Mode | Run these, in this order | Skip |
 |---|---|---|
-| `faq` (default) | **1 → 2 → 10 → 11 → 12 → 4 → 6 → 7** | 3, 5, 8, 9 (and the cost-cap half of 7) |
+| `faq` (default) | **1 → 2 → 10 → 11 → 12 → 13 → 4 → 6 → 7** | 3, 5, 8, 9 (and the cost-cap half of 7) |
 | `generative` | **1 → 2 → 3 → 4 → 5 → 6 → 7 → 8** (9 optional) | 10, 11, 12 |
 
 > **On the numbering:** checks 1–9 keep the numbers they have always had — the README and a couple
 > of code comments (`chat/router.py`) reference them by number — so the FAQ-mode checks added with
-> this mode are numbered 10–12 at the end rather than renumbering the file. Read them in the run
+> this mode are numbered 10–13 at the end rather than renumbering the file. Read them in the run
 > order above, not top to bottom.
 
 ---
@@ -34,6 +34,9 @@ Confirm in the Table Editor that these all exist:
 - column **`kb_documents.content_tsv`** (generated `tsvector`) with the GIN index
   `kb_documents_content_tsv_idx`,
 - column **`chat_sessions.flow_state`** (`jsonb`, nullable),
+- column **`kb_documents.managed_by`** (`text not null default 'file'`) and column
+  **`faq_misses.resolved`** (`boolean not null default false`) — the agent portal's ownership
+  columns, needed before anything is published (check 13),
 - functions `match_documents` (generative) and **`match_documents_fts`** (FAQ).
 
 `kb_documents.embedding` is now **nullable** — FAQ mode stores chunks with no vector at all.
@@ -345,5 +348,94 @@ While in a flow, confirm the guard rails:
 
 ---
 
-Checks 1, 2, 4, 6, 7 (rate limit), 10, 11, and 12 passing = **FAQ mode is production-ready**.
+## 13. Agent portal: sign in, publish, and survive a re-ingest
+
+**Applies to: FAQ mode, when the agent portal is enabled.** Skip it only if you are deliberately
+launching with `AGENT_PASSWORD` / `AGENT_SESSION_SECRET` blank — in which case run step 6 below on
+its own to prove the portal is closed rather than open.
+
+Set both secrets and restart, having already re-applied `schema.sql` (check 1) so
+`kb_documents.managed_by` and `faq_misses.resolved` exist:
+
+```bash
+cd backend
+AGENT_PASSWORD=test AGENT_SESSION_SECRET=devsecret \
+  ../venv/bin/python -m uvicorn app.main:app --port 8877
+```
+
+**1. Sign in.** Open `http://localhost:8877/agent`.
+
+- A wrong password shows *"Wrong password."* and sets no cookie.
+- Six wrong attempts inside a minute show *"Too many attempts. Wait a minute."* (login is limited
+  to 5/min per IP).
+- The right password reveals the FAQ gaps pane. With no unresolved misses it reads
+  *"No unanswered questions. The FAQ is keeping up."*
+
+**2. Create a gap.** In the widget (or by curl), ask something the KB cannot answer twice, varying
+only case and punctuation: `do you sell dog food` then `Do you sell dog food?`. Reload the portal.
+Expected: **one** entry reading *"asked 2 times"* and showing the more recent wording — grouping
+runs through `flows._norm`, which compares on letters and digits alone.
+
+**3. Publish an answer.** Expand the gap, give it a title and an answer, click **Publish to FAQ**.
+Expected: *"Published — visitors get this answer now."* and the gap disappears from the list.
+Confirm in Supabase:
+
+```sql
+select metadata->>'title' as title, managed_by, embedding is null as no_vector
+from kb_documents where managed_by = 'portal';
+
+select question, resolved from faq_misses order by created_at desc limit 5;
+```
+
+Expected: a `kb_documents` row with `managed_by = 'portal'` and a NULL embedding, and both
+`faq_misses` rows now `resolved = true`.
+
+**4. Ask the bot the same question again.** Expected: the answer just published comes back
+**verbatim**, with the 👍 / ✉️ feedback buttons — with **no re-ingest and no redeploy**
+(`content_tsv` is a generated column, so the entry is searchable the moment it commits).
+
+**5. The regression check — re-ingest, and confirm the entry is still there.**
+
+```bash
+cd backend && python -m app.rag.ingest
+```
+
+Then, in Supabase:
+
+```sql
+select metadata->>'title' as title, managed_by from kb_documents where managed_by = 'portal';
+```
+
+Expected: **the published row is still present.** Ask the bot the question once more and confirm
+the same answer still comes back.
+
+**If the row is gone, stop and do not launch.** Ingest is deleting the team's work — the prune in
+`backend/app/rag/ingest.py` has lost its `.eq("managed_by", "file")` scope, and every answer
+published in the portal is destroyed by the next KB update. This is the exact bug the `managed_by`
+column exists to prevent, which is why it gets its own check.
+
+**6. Sign out, and fail closed.** Click **Sign out**, then confirm the session is really gone:
+
+```bash
+curl -s -o /dev/null -w '%{http_code}\n' http://localhost:8877/agent/faq-gaps   # 401
+```
+
+Now blank both secrets and restart:
+
+```bash
+curl -s -o /dev/null -w '%{http_code}\n' http://localhost:8877/agent/faq-gaps   # 503
+curl -s -o /dev/null -w '%{http_code}\n' -X POST http://localhost:8877/chat \
+  -H 'Content-Type: application/json' -d '{"message":"do you ship to New York?"}'  # 200
+```
+
+Expected: the portal refuses service (**503, never 200 with data**) while the visitor chat is
+completely unaffected. An unconfigured deploy must never expose visitor questions.
+
+**In production** the portal must be reached over **HTTPS** — the session cookie is `Secure`
+whenever the request scheme is `https`, so a plain-HTTP host cannot complete a login.
+
+---
+
+Checks 1, 2, 4, 6, 7 (rate limit), 10, 11, and 12 passing = **FAQ mode is production-ready**;
+add 13 when the agent portal is enabled.
 Checks 1–8 passing = generative mode is production-ready; check 9 is an optional deeper gate there.
