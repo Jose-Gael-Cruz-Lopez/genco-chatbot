@@ -49,6 +49,9 @@ Widget (vanilla JS + quick-reply buttons) ──POST /chat──> FastAPI backen
                                                                  ├─ llm.py         OpenRouter completions (+ fallback model)
                                                                  ├─ guardrails     injection guard, cost cap
                                                                  └─ observability  LangFuse tracing of every turn
+
+Team browser (portal.html) ───────────────POST /agent/*──> FastAPI backend
+                                                            └─ agent/  signed-cookie auth, FAQ gaps, publish to KB
 ```
 
 Rate limiting, the UUID session guard, and the store-first lead pipeline run identically in both
@@ -139,8 +142,10 @@ lead end-to-end against production and do the **mobile + desktop QA** pass.
 
 ### 6. Optional, after it's live
 
-- Review the `faq_misses` table weekly and turn the gaps into new KB entries — see
-  [The FAQ backlog](#the-faq-backlog-faq_misses).
+- Set `AGENT_PASSWORD` and `AGENT_SESSION_SECRET` and work the FAQ backlog from the portal at
+  `/agent`, where each gap has a **Publish to FAQ** box — see
+  [Agent portal](#agent-portal-agent). Reading `faq_misses` straight from the Supabase table
+  editor still works and needs no secrets — see [The FAQ backlog](#the-faq-backlog-faq_misses).
 - **Generative mode only:** set the CI secret (`gh secret set OPENAI_API_KEY`) to activate the
   faithfulness gate, and add `requirements-ml.txt` to the image on an instance sized **~1–2 GB**
   to run the ML injection scanner (see
@@ -213,6 +218,8 @@ Railway/Fly) dashboard as service environment variables.
 | `PIPEDRIVE_DOMAIN` | Pipedrive company subdomain (e.g. `yourcompany`) | Your Pipedrive account URL |
 | `ALLOWED_ORIGINS` | Comma-separated CORS origins. Dev default (identical in `config.py` and `.env.example`): `http://localhost:8000,http://localhost:5500,http://127.0.0.1:5500`. The origin must exactly match how `widget/test.html` is served — `localhost` and `127.0.0.1` are different origins. | Production: set to exactly `https://generationconscious.co` before go-live |
 | `RATE_LIMIT_PER_MINUTE` | Max chat requests per IP per minute (default: `20`). Applies in **both** modes. | Tune based on traffic |
+| `AGENT_PASSWORD` | Shared password for the agent portal at `/agent`. Blank (the default) disables the portal — every `/agent` route returns 503. | Pick one and give it to the team |
+| `AGENT_SESSION_SECRET` | Signs the portal's session cookie. Blank also disables the portal. Keep it stable: rotating it signs everyone out. | Generate once: `python -c "import secrets;print(secrets.token_urlsafe(48))"` |
 
 ### Generative mode only
 
@@ -239,7 +246,8 @@ boots and answers questions with every one of them empty.
 2. In the [Render dashboard](https://render.com), create a new **Web Service**, or let Render
    auto-detect the **`render.yaml` Blueprint at the repo root**.
 3. The Blueprint builds `./backend/Dockerfile` with the **repository root as the build context**
-   (`dockerContext: .`), so the widget is bundled into the image (see "Serving the widget" below).
+   (`dockerContext: .`), so the widget and the agent portal are both bundled into the image (see
+   "Serving the widget" below).
 4. Set all environment variables from the table above in the Render **Environment** tab —
    `BOT_MODE=faq` included; the blueprint declares every key as `sync: false`, so nothing is
    inherited automatically.
@@ -301,6 +309,7 @@ and `backend/Dockerfile` does:
 ```dockerfile
 COPY backend/ /app
 COPY widget/dist /widget/dist
+COPY portal/dist /portal/dist
 ```
 
 Build manually from the repo root for local testing:
@@ -339,14 +348,38 @@ re-uploading to the CDN without triggering a backend redeploy.
 
 ## Adding / Updating Knowledge Base Content
 
-The knowledge base lives in `backend/knowledge_base/*.md`. Each file is plain Markdown, split into
-chunks at its Markdown headings.
+The knowledge base has **two halves with different owners**. This section covers the file half:
+`backend/knowledge_base/*.md`, plain Markdown split into chunks at its Markdown headings. Read
+[Two sources of knowledge](#two-sources-of-knowledge) before editing either half — confusing them
+is how the team's published answers get deleted.
 
 **In FAQ mode a chunk is shown to the visitor word for word**, so every chunk must read as a
 complete, standalone answer — no "see above", no half-sentences, no internal notes. Editing the KB
 *is* editing the bot's script.
 
-To add a new topic or update an existing answer:
+### Two sources of knowledge
+
+Every row in `kb_documents` carries a `managed_by` column naming its owner:
+
+| Written in | `managed_by` | Owned by | Changed by |
+|---|---|---|---|
+| `backend/knowledge_base/*.md` | `file` | `python -m app.rag.ingest` | editing the Markdown in the repo, then re-ingesting |
+| The portal's **Publish to FAQ** box | `portal` | the database | editing and re-publishing it in the portal |
+
+**Ingest prunes `managed_by='file'` rows only.** Entries published in the portal survive every
+re-ingest and every redeploy: they live in the database, they are not in the repo, and nothing in
+the repo can recreate them. The reverse holds too — `python -m app.rag.ingest` is the only thing
+that updates a file-authored entry, and pasting a portal answer into a Markdown file just leaves
+two copies of it in the table.
+
+In one line: **portal entries are edited in the portal, file entries in the repo.**
+
+Before `managed_by` existed, the prune deleted every row ingest had not written — so the first
+re-ingest after publishing wiped the team's answers. If a re-ingest ever loses a portal entry
+again, the `.eq("managed_by", "file")` scope on the delete in `backend/app/rag/ingest.py` is what
+broke.
+
+To add a new topic or update an existing **file** answer:
 
 1. Edit or add a `.md` file in `backend/knowledge_base/`.
 2. Re-run the ingest script:
@@ -403,6 +436,11 @@ When a user asks something the bot cannot answer:
 This is the **approved pathway for growing the KB** — it keeps humans in the loop before any
 new content is served by the bot.
 
+The portal at `/agent` is the same loop without the repo round-trip: the question is already
+waiting there as a gap, publishing the answer stores it as a `managed_by='portal'` row, and it is
+live within seconds. A human still writes every word. See
+[Agent portal](#agent-portal-agent).
+
 ### Embedding model migration note (generative mode only)
 
 The generative pipeline's embedding model is `text-embedding-3-small` (1536 dimensions).
@@ -413,6 +451,83 @@ The generative pipeline's embedding model is `text-embedding-3-small` (1536 dime
 
 Do not change `EMBEDDING_MODEL` without performing both steps — mixed-dimension vectors will
 produce nonsense retrieval scores. FAQ mode is unaffected: it stores no vectors.
+
+---
+
+## Agent portal (`/agent`)
+
+`GET /agent` serves `portal/dist/portal.html` — one self-contained page, no build step and no
+framework, bundled into the Docker image the same way `widget/dist/widget.js` is. It is the team's
+side of the bot: sign in with a shared password and every question the FAQ could not answer is
+listed there, grouped by wording and ordered most-asked first, each with a **Publish to FAQ** box
+that turns it into a permanent KB entry.
+
+That loop is the whole point — a gap that gets published stops reaching a human.
+[Two sources of knowledge](#two-sources-of-knowledge) explains who owns the entry afterwards.
+
+**Still zero AI.** Nothing under `backend/app/agent/` imports a model client; publishing stores
+text a person typed.
+
+### Turning it on
+
+Two secrets, both blank by default and both declared `sync: false` in `render.yaml`. Generate the
+signing secret once:
+
+```bash
+python -c "import secrets;print(secrets.token_urlsafe(48))"
+```
+
+then set both in `backend/.env` locally and in the Render dashboard for production:
+
+```
+AGENT_PASSWORD=the-password-you-give-the-team
+AGENT_SESSION_SECRET=<the generated string>
+```
+
+`AGENT_SESSION_SECRET` signs the login cookie, so keep it stable — rotating it invalidates every
+open session, which is also how you sign everyone out on purpose.
+
+**With either value blank the portal is off, not open:** the login page still loads and says *"The
+portal isn't configured yet."*, while every `/agent/*` API route returns 503 and logs why. An
+unconfigured deploy therefore cannot expose visitor questions to the internet, and the visitor chat
+is unaffected either way.
+
+The database needs the portal columns too — re-apply `backend/app/rag/schema.sql` in the Supabase
+SQL editor to add `kb_documents.managed_by` and `faq_misses.resolved`. The whole file is
+re-runnable.
+
+### The session
+
+| Property | Value |
+|---|---|
+| Cookie | `gc_agent` — `HttpOnly`, `SameSite=Strict`, `Path=/agent` |
+| Contents | `base64({"exp": …}).base64(hmac_sha256(payload, AGENT_SESSION_SECRET))` — stdlib only, nothing stored server-side |
+| Lifetime | 12 hours |
+| `Secure` | derived from the request scheme, so `http://localhost` can still sign in while production stays strict |
+| Login rate limit | 5 attempts per minute per IP, a separate bucket from the chat limiter |
+
+`SameSite=Strict` is what stops the permissive CORS policy the widget needs from being used to
+reach these routes with credentials from the WordPress origin.
+
+### Running it locally
+
+```bash
+cd backend
+AGENT_PASSWORD=test AGENT_SESSION_SECRET=devsecret \
+  ../venv/bin/python -m uvicorn app.main:app --port 8877
+```
+
+Then open `http://localhost:8877/agent`. In production the portal must be reached over **HTTPS** —
+the cookie is `Secure` there, so a plain-HTTP host can never complete a login.
+
+### What publishing actually does
+
+`POST /agent/faq-entry` writes one `kb_documents` row with `managed_by='portal'`,
+`embedding = NULL`, `metadata = {"source": "portal", "title": …}`, and the same `sha256(content)`
+hash ingest uses — so republishing a corrected answer upserts over the old one instead of
+duplicating it. `content_tsv` is a generated column, so the entry is searchable the moment the
+insert commits: **no re-ingest, no redeploy.** The `faq_misses` rows behind that gap are then
+marked `resolved = true`, which is what takes it off the list.
 
 ---
 
@@ -599,7 +714,7 @@ gate.
 genco-chatbot/
 ├── backend/
 │   ├── app/
-│   │   ├── main.py              # FastAPI app, CORS, static widget mount
+│   │   ├── main.py              # FastAPI app, CORS, widget mount, /agent portal page
 │   │   ├── config.py            # pydantic-settings Settings (BOT_MODE; reads backend/.env)
 │   │   ├── db.py                # Supabase client factory
 │   │   ├── llm.py               # OpenRouter completions + fallback model (generative only)
@@ -610,6 +725,8 @@ genco-chatbot/
 │   │   ├── faq_misses.py        # FAQ backlog: one row per feedback event (no PII)
 │   │   ├── guardrails.py        # rate limit (both modes), cost cap + injection guard (generative)
 │   │   ├── injection_scanner.py # optional ML injection scanner (LLM Guard, lazy, generative)
+│   │   ├── agent/               # auth.py (signed-cookie login), faq_gaps.py (backlog +
+│   │   │                        #   publishing), router.py (/agent routes)
 │   │   ├── rag/                 # fts.py (FAQ full-text match), embeddings.py, ingest.py,
 │   │   │                        #   retrieve.py (generative), schema.sql
 │   │   └── chat/                # router.py (mode branch), flows.py (FAQ state machine),
@@ -626,6 +743,9 @@ genco-chatbot/
 │   │   └── widget.js            # embed widget (single hand-authored file, renders quick replies)
 │   ├── test.html                # widget QA page (offline stub via ?stub=1)
 │   └── stub_server.py           # zero-key stub backend for widget QA (canned FAQ conversation)
+├── portal/
+│   └── dist/
+│       └── portal.html          # agent portal (single self-contained file, served at /agent)
 ├── render.yaml                  # Render Blueprint (repo root; dockerContext: .)
 ├── .env.example                 # template — copy to backend/.env
 ├── VERIFICATION.md              # deferred live-key checks
@@ -637,4 +757,4 @@ The Supabase schema lives at `backend/app/rag/schema.sql` (there is no `backend/
 lead logic is flat modules under `backend/app/` — there are no `leads/` or `guardrails/` packages.
 Re-applying the whole schema file is safe and idempotent; it upgrades an existing project in place
 with the FAQ objects (`content_tsv` + GIN index, `match_documents_fts`, `chat_sessions.flow_state`,
-`faq_misses`).
+`faq_misses`) and the agent-portal columns (`kb_documents.managed_by`, `faq_misses.resolved`).
