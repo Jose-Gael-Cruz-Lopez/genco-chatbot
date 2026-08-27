@@ -1,5 +1,6 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from pathlib import Path
 
@@ -25,6 +26,19 @@ def health() -> dict[str, str]:
 from app.chat.router import router as chat_router
 app.include_router(chat_router)
 
+from app.agent.router import router as agent_router
+app.include_router(agent_router)
+
 _widget_dir = Path(__file__).resolve().parent.parent.parent / "widget" / "dist"
 if _widget_dir.exists():
     app.mount("/widget", StaticFiles(directory=str(_widget_dir)), name="widget")
+
+# The portal is a single self-contained file, served at /agent so the session
+# cookie's Path=/agent covers the page and its API calls alike.
+_portal_file = (Path(__file__).resolve().parent.parent.parent
+                / "portal" / "dist" / "portal.html")
+
+
+@app.get("/agent", include_in_schema=False)
+def agent_portal() -> FileResponse:
+    return FileResponse(str(_portal_file), media_type="text/html")
