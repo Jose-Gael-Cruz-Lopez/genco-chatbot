@@ -97,3 +97,15 @@ create table if not exists faq_misses (
   created_at timestamptz default now()
 );
 create index if not exists faq_misses_created_idx on faq_misses(created_at desc);
+
+-- ── Portal-authored knowledge (agent portal) ──────────────────────────────
+-- Who owns a row: 'file' = authored in backend/knowledge_base/*.md and owned by
+-- ingest; 'portal' = written by the team in the agent portal and owned by the
+-- database. Ingest prunes ONLY file-managed rows — without this, the first
+-- re-ingest after publishing deletes every portal-written answer.
+alter table kb_documents add column if not exists managed_by text not null default 'file';
+create index if not exists kb_documents_managed_by_idx on kb_documents(managed_by);
+
+-- A gap leaves the portal's list once someone publishes an answer for it.
+alter table faq_misses add column if not exists resolved boolean not null default false;
+create index if not exists faq_misses_unresolved_idx on faq_misses(resolved, created_at desc);
