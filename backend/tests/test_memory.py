@@ -61,3 +61,60 @@ def test_get_recent_messages_returns_most_recent_in_chronological_order(sb):
     assert kwargs.get("desc") is True
     # ...and the returned list is reversed back to chronological (oldest -> newest)
     assert [m["content"] for m in out] == ["oldest", "middle", "newest"]
+
+
+def _sb_with_select(rows):
+    sb = MagicMock()
+    sb.table.return_value.select.return_value.eq.return_value.execute.return_value = (
+        MagicMock(data=rows))
+    return sb
+
+
+def test_get_flow_state_returns_the_stored_dict():
+    state = {"state": "awaiting_feedback", "question": "do you ship"}
+    with patch("app.chat.memory.get_supabase",
+               return_value=_sb_with_select([{"flow_state": state}])):
+        assert memory.get_flow_state("11111111-1111-1111-1111-111111111111") == state
+
+
+def test_get_flow_state_returns_none_for_idle_session():
+    with patch("app.chat.memory.get_supabase",
+               return_value=_sb_with_select([{"flow_state": None}])):
+        assert memory.get_flow_state("11111111-1111-1111-1111-111111111111") is None
+
+
+def test_get_flow_state_returns_none_for_unknown_session():
+    with patch("app.chat.memory.get_supabase", return_value=_sb_with_select([])):
+        assert memory.get_flow_state("11111111-1111-1111-1111-111111111111") is None
+
+
+def test_get_flow_state_returns_none_for_non_uuid_without_touching_db():
+    with patch("app.chat.memory.get_supabase") as sb:
+        assert memory.get_flow_state("not-a-uuid") is None
+    sb.assert_not_called()
+
+
+def test_get_flow_state_returns_none_for_corrupt_non_dict_value():
+    with patch("app.chat.memory.get_supabase",
+               return_value=_sb_with_select([{"flow_state": "garbage"}])):
+        assert memory.get_flow_state("11111111-1111-1111-1111-111111111111") is None
+
+
+def test_set_flow_state_writes_the_state():
+    sb = MagicMock()
+    with patch("app.chat.memory.get_supabase", return_value=sb):
+        memory.set_flow_state("11111111-1111-1111-1111-111111111111", {"state": "lead"})
+    sb.table.return_value.update.assert_called_once_with({"flow_state": {"state": "lead"}})
+
+
+def test_set_flow_state_clears_with_none():
+    sb = MagicMock()
+    with patch("app.chat.memory.get_supabase", return_value=sb):
+        memory.set_flow_state("11111111-1111-1111-1111-111111111111", None)
+    sb.table.return_value.update.assert_called_once_with({"flow_state": None})
+
+
+def test_set_flow_state_ignores_non_uuid():
+    with patch("app.chat.memory.get_supabase") as sb:
+        memory.set_flow_state("not-a-uuid", {"state": "lead"})
+    sb.assert_not_called()
