@@ -1,6 +1,7 @@
 import hashlib
 import re
 from pathlib import Path
+from app.config import get_settings
 from app.db import get_supabase
 from app.rag.embeddings import embed_batch
 
@@ -50,8 +51,13 @@ def ingest_all() -> int:
         # An empty knowledge_base/ is almost certainly an operator error;
         # refuse to wipe the production KB over it.
         return 0
-    # Embed BEFORE any database write — if this raises, the old KB keeps serving.
-    vectors = embed_batch([c["content"] for c in all_chunks])
+    # FAQ mode matches with Postgres full-text search and reaches no AI service at
+    # all, so chunks are stored with a NULL embedding. Generative mode embeds
+    # BEFORE any database write — if that raises, the old KB keeps serving.
+    if get_settings().BOT_MODE == "faq":
+        vectors: list[list[float] | None] = [None] * len(all_chunks)
+    else:
+        vectors = embed_batch([c["content"] for c in all_chunks])
     # Dedupe by content_hash: duplicate hashes in one upsert statement fail with
     # Postgres "ON CONFLICT DO UPDATE command cannot affect row a second time".
     rows_by_hash: dict[str, dict] = {}
