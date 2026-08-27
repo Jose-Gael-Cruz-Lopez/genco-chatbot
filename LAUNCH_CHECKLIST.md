@@ -21,6 +21,10 @@ entirely unless you are deliberately launching with `BOT_MODE=generative`.
   file is re-runnable and upgrades an existing project in place, adding the FAQ objects:
   `kb_documents.content_tsv` + its GIN index, `match_documents_fts`, `chat_sessions.flow_state`,
   and the `faq_misses` table (and making `kb_documents.embedding` nullable).
+- [ ] That same re-apply added the **agent-portal ownership columns**: `kb_documents.managed_by`
+  (`text not null default 'file'`) and `faq_misses.resolved` (`boolean not null default false`).
+  Confirm both exist in the Table Editor **before** anyone publishes from the portal — without
+  `managed_by`, the next re-ingest deletes every published answer.
 - [ ] KB re-ingested **after** the schema change so every chunk is searchable:
   ```bash
   cd backend && python -m app.rag.ingest
@@ -107,7 +111,37 @@ entirely unless you are deliberately launching with `BOT_MODE=generative`.
 - [ ] Pipedrive person and deal created correctly for both flows.
 - [ ] `faq_misses` is filling up: after the checks above, the table holds one row per 👍/✉️ tap and
   per no-match. This is the FAQ backlog the team reviews to grow the KB — confirm someone owns
-  that review.
+  that review. The portal at `/agent` is where that review happens (see
+  [Agent portal](#agent-portal)); the Supabase table editor is the fallback.
+
+---
+
+## Agent portal
+
+`/agent` is the team's side of the bot: every question the FAQ could not answer, each with a
+**Publish to FAQ** box that turns it into a permanent entry. It fails closed — with either secret
+blank, every `/agent/*` API route returns 503, the login page says so, and the visitor chat is
+untouched.
+
+- [ ] `AGENT_PASSWORD` and `AGENT_SESSION_SECRET` are both set in the production environment
+  (Render → Environment; both are `sync: false` in `render.yaml`). Generate the secret with
+  `python -c "import secrets;print(secrets.token_urlsafe(48))"` and keep it stable — rotating it
+  signs everyone out. **Launching without the portal is a valid choice:** leave both blank, confirm
+  `curl -s -o /dev/null -w '%{http_code}' https://YOUR-BACKEND-HOST/agent/faq-gaps` returns **503**,
+  and skip the rest of this section.
+- [ ] `/agent` is reachable **over HTTPS** in production and the login screen loads. The session
+  cookie is `Secure` whenever the request scheme is `https`, so a plain-HTTP host cannot sign in.
+- [ ] A wrong password is rejected — the page shows "Wrong password." and no session starts. Six
+  attempts in a minute return "Too many attempts. Wait a minute." (login is limited to 5/min per
+  IP, separately from the chat limiter).
+- [ ] Publishing works end-to-end (VERIFICATION check 13): a gap publishes, leaves the list, and
+  the bot answers that question with the new entry on the very next turn — no re-ingest, no
+  redeploy.
+- [ ] **A published entry survives a re-ingest.** Run `cd backend && python -m app.rag.ingest`,
+  then confirm the `managed_by = 'portal'` row is still in `kb_documents`. If it is gone, ingest is
+  deleting the team's work — do not launch (VERIFICATION check 13, step 5).
+- [ ] Whoever edits the knowledge base knows the split: **portal entries are edited in the portal,
+  `backend/knowledge_base/*.md` entries in the repo** (README → Two sources of knowledge).
 
 ---
 
