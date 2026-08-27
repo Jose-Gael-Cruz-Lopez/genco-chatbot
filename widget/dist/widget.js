@@ -12,8 +12,8 @@
   var cfg = window.GENCO_CONFIG || {};
   var script = document.currentScript;
   var BACKEND_URL = cfg.backendUrl || (script && script.dataset.backendUrl) || "http://localhost:8000";
-  var PRIMARY = cfg.primaryColor || "#FF0719"; // derived from live site 2026-08 — confirm with GC team
-  var LOGO = cfg.logoUrl || "https://generationconscious.co/wp-content/uploads/2022/02/Droplet.g_Wordmark-300x106.png"; // derived from live site 2026-08 — confirm with GC team
+  var PRIMARY = cfg.primaryColor || "#FF0719"; // approved by GC team 2026-08-10
+  var LOGO = cfg.logoUrl || "https://generationconscious.co/wp-content/uploads/2022/02/Droplet.g_Wordmark-300x106.png"; // approved by GC team 2026-08-10
   var KEY = "genco_session_id";
   var FRIENDLY_ERROR = "I'm having trouble reaching the team right now — please email Info@GenerationConscious.co.";
 
@@ -91,15 +91,22 @@
     d.className = "gc-b " + (role === "user" ? "gc-user" : "gc-bot");
     d.textContent = text; msgs.appendChild(d); msgs.scrollTop = msgs.scrollHeight;
   }
-  function greet() {
-    bubble("bot", "How can we support your sustainability journey?");
+  /* Buttons under a bot message. Labels are set with textContent (never
+   * innerHTML) so server-supplied text can't inject markup. Tapping sends the
+   * label as a normal user message — the same mechanism the greeting uses. */
+  function quickReplies(labels) {
+    if (!labels || !labels.length) return;
     var qr = document.createElement("div"); qr.className = "gc-qr";
-    ["Buy Sheets", "Buy Refill Stations", "Question for the team"].forEach(function (label) {
+    labels.forEach(function (label) {
       var b = document.createElement("button"); b.textContent = label;
       b.onclick = function () { qr.remove(); send(label); };
       qr.appendChild(b);
     });
-    msgs.appendChild(qr);
+    msgs.appendChild(qr); msgs.scrollTop = msgs.scrollHeight;
+  }
+  function greet() {
+    bubble("bot", "How can we support your sustainability journey?");
+    quickReplies(["Buy Sheets", "Buy Refill Stations", "Question for the team"]);
   }
   function loadHistory() {
     fetch(BACKEND_URL + "/history?session_id=" + encodeURIComponent(sessionId))
@@ -125,6 +132,7 @@
       typing.remove();
       if (data.session_id) { sessionId = data.session_id; storeSet(KEY, sessionId); }
       bubble("bot", data.reply || FRIENDLY_ERROR);
+      quickReplies(data.quick_replies);
     }).catch(function () {
       typing.remove();
       bubble("bot", FRIENDLY_ERROR);
