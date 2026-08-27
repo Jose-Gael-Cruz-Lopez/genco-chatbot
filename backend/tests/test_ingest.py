@@ -61,6 +61,10 @@ def test_ingest_deletes_only_rows_outside_new_hash_set(tmp_path, monkeypatch):
 
 def test_ingest_failed_embed_leaves_db_untouched(tmp_path, monkeypatch):
     """A failed embed must leave the old KB serving: no delete, no upsert."""
+    # Only generative mode embeds at all; FAQ mode has no embed step to fail.
+    from app.config import get_settings
+    get_settings.cache_clear()
+    monkeypatch.setenv("BOT_MODE", "generative")
     monkeypatch.setattr(ingest, "KB_DIR", _write_kb(tmp_path, {
         "a.md": "# Sheets\n\nBuy sheets on the product page.",
     }))
@@ -72,6 +76,7 @@ def test_ingest_failed_embed_leaves_db_untouched(tmp_path, monkeypatch):
     calls = _call_names(sb)
     assert not any("delete" in c for c in calls)
     assert not any("upsert" in c for c in calls)
+    get_settings.cache_clear()
 
 
 def test_ingest_dedupes_rows_by_content_hash(tmp_path, monkeypatch):
@@ -100,3 +105,37 @@ def test_ingest_empty_kb_returns_zero_without_touching_db(tmp_path, monkeypatch)
          patch.object(ingest, "embed_batch", side_effect=_fake_vectors):
         assert ingest.ingest_all() == 0
     assert not sb.mock_calls
+
+
+def test_faq_mode_ingest_makes_no_embedding_calls(monkeypatch, tmp_path):
+    from app.config import get_settings
+    get_settings.cache_clear()
+    monkeypatch.setenv("BOT_MODE", "faq")
+    kb = tmp_path / "kb"
+    kb.mkdir()
+    (kb / "a.md").write_text("# Shipping\nWe ship via USPS.")
+    monkeypatch.setattr("app.rag.ingest.KB_DIR", kb)
+    sb = MagicMock()
+    with patch("app.rag.ingest.get_supabase", return_value=sb), \
+         patch("app.rag.ingest.embed_batch") as embed:
+        count = ingest.ingest_all()
+    embed.assert_not_called()
+    assert count == 1
+    rows = sb.table.return_value.upsert.call_args[0][0]
+    assert all(r["embedding"] is None for r in rows)
+    get_settings.cache_clear()
+
+
+def test_generative_mode_ingest_still_embeds(monkeypatch, tmp_path):
+    from app.config import get_settings
+    get_settings.cache_clear()
+    monkeypatch.setenv("BOT_MODE", "generative")
+    kb = tmp_path / "kb"
+    kb.mkdir()
+    (kb / "a.md").write_text("# Shipping\nWe ship via USPS.")
+    monkeypatch.setattr("app.rag.ingest.KB_DIR", kb)
+    with patch("app.rag.ingest.get_supabase"), \
+         patch("app.rag.ingest.embed_batch", return_value=[[0.1] * 1536]) as embed:
+        ingest.ingest_all()
+    embed.assert_called_once()
+    get_settings.cache_clear()
