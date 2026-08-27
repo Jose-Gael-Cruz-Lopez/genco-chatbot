@@ -15,3 +15,17 @@ def test_faq_mode_needs_no_ai_keys():
     s = Settings(OPENROUTER_API_KEY="", EMBEDDING_API_KEY="", LANGFUSE_PUBLIC_KEY="")
     assert s.BOT_MODE == "faq"
     assert s.OPENROUTER_API_KEY == ""
+
+
+def test_agent_portal_settings_default_to_empty():
+    s = Settings()
+    assert s.AGENT_PASSWORD == ""
+    assert s.AGENT_SESSION_SECRET == ""
+
+
+def test_agent_portal_settings_read_env(monkeypatch):
+    monkeypatch.setenv("AGENT_PASSWORD", "hunter2")
+    monkeypatch.setenv("AGENT_SESSION_SECRET", "s3cret")
+    s = Settings()
+    assert s.AGENT_PASSWORD == "hunter2"
+    assert s.AGENT_SESSION_SECRET == "s3cret"
