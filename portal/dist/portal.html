@@ -1,0 +1,273 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>Generation Conscious — Agent Portal</title>
+<style>
+  :root {
+    --primary: #FF0719;
+    --ink: #1A1618;
+    --muted: #6E6568;
+    --rule: #E4DFE0;
+    --ground: #F7F5F5;
+    --surface: #FFFFFF;
+    --good: #157F4A;
+    --good-bg: #E6F4EC;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--ground); color: var(--ink);
+    font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+    font-size: 15px; line-height: 1.5;
+  }
+  .bar {
+    background: var(--primary); color: #fff; padding: 12px 20px;
+    display: flex; align-items: center; gap: 12px; font-weight: 600;
+  }
+  .bar .spacer { margin-left: auto; }
+  .bar button {
+    background: rgba(255,255,255,.15); color: #fff; border: 1px solid rgba(255,255,255,.4);
+    border-radius: 6px; padding: 5px 12px; cursor: pointer; font-size: 13px;
+  }
+  .bar button:hover { background: rgba(255,255,255,.28); }
+  main { max-width: 780px; margin: 0 auto; padding: 24px 20px 64px; }
+  h1 { font-size: 20px; margin: 0 0 6px; }
+  .sub { color: var(--muted); margin: 0 0 22px; font-size: 14px; }
+  .card {
+    background: var(--surface); border: 1px solid var(--rule); border-radius: 10px;
+    padding: 16px 18px; margin-bottom: 10px;
+  }
+  .q { font-weight: 600; margin: 0 0 4px; }
+  .meta { color: var(--muted); font-size: 13px; margin: 0; }
+  label { display: block; font-size: 13px; color: var(--muted); margin: 12px 0 4px; }
+  input[type=text], input[type=password], textarea {
+    width: 100%; border: 1px solid var(--rule); border-radius: 6px;
+    padding: 9px 11px; font: inherit; background: #fff; color: var(--ink);
+  }
+  textarea { min-height: 110px; resize: vertical; }
+  input:focus, textarea:focus, button:focus-visible {
+    outline: 2px solid var(--primary); outline-offset: 1px; border-color: var(--primary);
+  }
+  .btn {
+    background: var(--primary); color: #fff; border: 0; border-radius: 6px;
+    padding: 9px 16px; font: inherit; font-weight: 600; cursor: pointer;
+  }
+  .btn:disabled { opacity: .55; cursor: default; }
+  .btn.ghost { background: none; color: var(--muted); border: 1px solid var(--rule); font-weight: 400; }
+  .row { display: flex; gap: 8px; align-items: center; margin-top: 12px; flex-wrap: wrap; }
+  .err { color: var(--primary); font-size: 14px; margin: 10px 0 0; min-height: 20px; }
+  .ok { color: var(--good); background: var(--good-bg); border-radius: 6px; padding: 10px 12px; font-size: 14px; }
+  .empty { color: var(--muted); text-align: center; padding: 40px 0; }
+  .login { max-width: 340px; margin: 12vh auto; }
+  .hidden { display: none; }
+</style>
+</head>
+<body>
+
+<div class="bar" id="bar" hidden>
+  <span>Generation Conscious</span>
+  <span class="spacer"></span>
+  <button id="signout" type="button">Sign out</button>
+</div>
+
+<main>
+  <!-- Login -->
+  <section id="login" class="login">
+    <h1>Agent portal</h1>
+    <p class="sub">Sign in to answer the questions the FAQ couldn't.</p>
+    <form id="loginForm">
+      <label for="pw">Password</label>
+      <input type="password" id="pw" autocomplete="current-password" required>
+      <div class="row"><button class="btn" type="submit" id="signin">Sign in</button></div>
+      <p class="err" id="loginErr" role="alert"></p>
+    </form>
+  </section>
+
+  <!-- FAQ gaps -->
+  <section id="gaps" class="hidden">
+    <h1>Questions the FAQ couldn't answer</h1>
+    <p class="sub">Answer one here and it goes live immediately — the next visitor who asks gets it,
+      and it never reaches you again.</p>
+    <div id="list"></div>
+    <p class="err" id="gapsErr" role="alert"></p>
+  </section>
+</main>
+
+<script>
+(function () {
+  "use strict";
+
+  var el = function (id) { return document.getElementById(id); };
+
+  /* All portal text below is either our own copy or visitor-typed question text.
+     Everything visitor-supplied is set with textContent, never innerHTML. */
+  function api(path, options) {
+    var opts = options || {};
+    opts.credentials = "same-origin";
+    opts.headers = Object.assign({ "Content-Type": "application/json" }, opts.headers || {});
+    return fetch("/agent" + path, opts).then(function (r) {
+      return r.json().catch(function () { return {}; }).then(function (body) {
+        if (!r.ok) {
+          var e = new Error(body.detail || "Request failed");
+          e.status = r.status;
+          throw e;
+        }
+        return body;
+      });
+    });
+  }
+
+  function loginMessage(status) {
+    if (status === 401) return "Wrong password.";
+    if (status === 429) return "Too many attempts. Wait a minute.";
+    if (status === 503) return "The portal isn't configured yet.";
+    return "Couldn't sign in. Check your connection and try again.";
+  }
+
+  /* ── screens ─────────────────────────────────────────────────────────── */
+  function showLogin() {
+    el("bar").hidden = true;
+    el("login").classList.remove("hidden");
+    el("gaps").classList.add("hidden");
+    el("pw").value = "";
+    el("pw").focus();
+  }
+
+  function showGaps() {
+    el("bar").hidden = false;
+    el("login").classList.add("hidden");
+    el("gaps").classList.remove("hidden");
+    loadGaps();
+  }
+
+  /* ── gaps list ───────────────────────────────────────────────────────── */
+  function loadGaps() {
+    el("gapsErr").textContent = "";
+    api("/faq-gaps").then(function (data) {
+      render(data.gaps || []);
+    }).catch(function (e) {
+      if (e.status === 401) { showLogin(); return; }
+      el("gapsErr").textContent = "Couldn't load questions. Refresh to try again.";
+    });
+  }
+
+  function render(gaps) {
+    var list = el("list");
+    list.textContent = "";
+    if (!gaps.length) {
+      var empty = document.createElement("p");
+      empty.className = "empty";
+      empty.textContent = "No unanswered questions. The FAQ is keeping up.";
+      list.appendChild(empty);
+      return;
+    }
+    gaps.forEach(function (gap) { list.appendChild(card(gap)); });
+  }
+
+  function card(gap) {
+    var wrap = document.createElement("div");
+    wrap.className = "card";
+
+    var q = document.createElement("p");
+    q.className = "q";
+    q.textContent = gap.question;          // visitor-typed — textContent only
+    wrap.appendChild(q);
+
+    var meta = document.createElement("p");
+    meta.className = "meta";
+    meta.textContent = gap.count > 1 ? "Asked " + gap.count + " times" : "Asked once";
+    wrap.appendChild(meta);
+
+    var titleLabel = document.createElement("label");
+    titleLabel.textContent = "Title";
+    var title = document.createElement("input");
+    title.type = "text";
+    title.placeholder = "Shipping and delivery";
+
+    var answerLabel = document.createElement("label");
+    answerLabel.textContent = "Answer — shown to visitors word for word";
+    var answer = document.createElement("textarea");
+    answer.placeholder = "Write the answer exactly as you want a customer to read it.";
+
+    var row = document.createElement("div");
+    row.className = "row";
+    var publish = document.createElement("button");
+    publish.className = "btn";
+    publish.type = "button";
+    publish.textContent = "Publish to FAQ";
+    var err = document.createElement("p");
+    err.className = "err";
+    err.setAttribute("role", "alert");
+
+    publish.onclick = function () {
+      err.textContent = "";
+      publish.disabled = true;
+      publish.textContent = "Publishing…";
+      api("/faq-entry", {
+        method: "POST",
+        body: JSON.stringify({
+          title: title.value,
+          content: answer.value,
+          resolve_ids: gap.ids || []
+        })
+      }).then(function () {
+        var done = document.createElement("p");
+        done.className = "ok";
+        done.textContent = "Published — visitors get this answer now.";
+        wrap.textContent = "";
+        wrap.appendChild(done);
+        setTimeout(function () {
+          wrap.remove();
+          if (!el("list").children.length) { render([]); }
+        }, 2500);
+      }).catch(function (e) {
+        publish.disabled = false;
+        publish.textContent = "Publish to FAQ";
+        if (e.status === 401) { showLogin(); return; }
+        err.textContent = e.message || "Couldn't publish. Try again.";
+      });
+    };
+
+    row.appendChild(publish);
+    wrap.appendChild(titleLabel);
+    wrap.appendChild(title);
+    wrap.appendChild(answerLabel);
+    wrap.appendChild(answer);
+    wrap.appendChild(row);
+    wrap.appendChild(err);
+    return wrap;
+  }
+
+  /* ── wiring ──────────────────────────────────────────────────────────── */
+  el("loginForm").addEventListener("submit", function (ev) {
+    ev.preventDefault();
+    var btn = el("signin");
+    el("loginErr").textContent = "";
+    btn.disabled = true;
+    api("/login", { method: "POST", body: JSON.stringify({ password: el("pw").value }) })
+      .then(function () { btn.disabled = false; showGaps(); })
+      .catch(function (e) {
+        btn.disabled = false;
+        el("loginErr").textContent = loginMessage(e.status);
+        el("pw").select();
+      });
+  });
+
+  el("signout").onclick = function () {
+    api("/logout", { method: "POST" }).catch(function () { /* sign out locally regardless */ })
+      .then(showLogin);
+  };
+
+  /* An unexpired cookie from a previous visit means we can go straight in. */
+  api("/faq-gaps").then(function (data) {
+    el("bar").hidden = false;
+    el("login").classList.add("hidden");
+    el("gaps").classList.remove("hidden");
+    render(data.gaps || []);
+  }).catch(showLogin);
+})();
+</script>
+</body>
+</html>
