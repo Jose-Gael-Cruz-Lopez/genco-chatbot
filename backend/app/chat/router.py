@@ -8,7 +8,7 @@ from app.config import get_settings
 from app import guardrails
 from app import injection_scanner
 from app.observability import trace_turn
-from app.chat import memory, prompts
+from app.chat import flows, memory, prompts
 from app.chat.tools import CAPTURE_LEAD_TOOL
 from app.escalation import capture_lead, is_lead_flow_turn, should_escalate
 from app.rag.retrieve import retrieve
@@ -43,10 +43,18 @@ _LEAD_FALLBACK_REPLY = (
 )
 
 # Returned when both the primary and fallback models fail (e.g. one OpenRouter outage takes
-# out both) — never 500; keep the frozen {session_id, reply, retrieval_scores} contract.
+# out both) — never 500; keep the frozen
+# {session_id, reply, retrieval_scores, quick_replies} contract.
 _UNAVAILABLE_REPLY = (
     "I'm momentarily unavailable. Please email Info@GenerationConscious.co or text "
     "(516) 619-6174 and the team will help."
+)
+
+# FAQ mode never calls a model, so its only failure is the database. Same
+# never-crash rule: log, offer the human path, keep the 200 contract.
+_FAQ_FALLBACK_REPLY = (
+    "I'm having trouble looking that up right now. Please email "
+    "Info@GenerationConscious.co or text (516) 619-6174 and the team will help."
 )
 
 
@@ -67,6 +75,23 @@ class ChatRequest(BaseModel):
     message: str
 
 
+def _faq_turn(req: ChatRequest) -> dict:
+    """One zero-AI turn: full-text match + deterministic flows, no model call."""
+    session_id = memory.get_or_create_session(req.session_id)
+    memory.save_message(session_id, "user", req.message)
+    try:
+        state = memory.get_flow_state(session_id)
+        reply, quick_replies, next_state, scores = flows.handle_turn(
+            session_id, req.message, state)
+        memory.set_flow_state(session_id, next_state)
+    except Exception:
+        logger.exception("FAQ turn failed; returning the contact fallback.")
+        reply, quick_replies, scores = _FAQ_FALLBACK_REPLY, [], []
+    memory.save_message(session_id, "assistant", reply)
+    return {"session_id": session_id, "reply": reply,
+            "retrieval_scores": scores, "quick_replies": quick_replies}
+
+
 @router.post("/chat")
 def chat(req: ChatRequest, request: Request) -> dict:
     # Guard gates run BEFORE any Supabase call: throttled/capped/declined requests must not
@@ -74,23 +99,26 @@ def chat(req: ChatRequest, request: Request) -> dict:
     # session_id (or "") since no session is looked up or minted on these paths.
     echo_id = req.session_id or ""
     # Rate-limit by client IP, not the browser-supplied session_id (which a client can rotate/omit
-    # to mint a fresh bucket every request).
+    # to mint a fresh bucket every request). Applies in BOTH modes.
     if not _rate_limiter.allow(_client_ip(request)):
         return {"session_id": echo_id,
                 "reply": "You're sending messages quickly — give me a moment and try again.",
-                "retrieval_scores": []}
+                "retrieval_scores": [], "quick_replies": []}
+    # FAQ mode branches here: no model to protect from injection, no spend to cap.
+    if _settings.BOT_MODE == "faq":
+        return _faq_turn(req)
     if _cost.exceeded():
         logger.warning(
             "Daily cost cap exceeded; returning static unavailable message "
             "(fallback model NOT invoked).")
         return {"session_id": echo_id,
                 "reply": "I'm momentarily unavailable. Please email Info@GenerationConscious.co and the team will help.",
-                "retrieval_scores": []}
+                "retrieval_scores": [], "quick_replies": []}
     # Substring guard (always on, cheap) + optional ML scanner (LLM Guard) when installed.
     if guardrails.is_injection_attempt(req.message) or injection_scanner.is_injection(req.message):
         return {"session_id": echo_id,
                 "reply": "I can only help with Generation Conscious products and orders. How can I help with that?",
-                "retrieval_scores": []}
+                "retrieval_scores": [], "quick_replies": []}
     session_id = memory.get_or_create_session(req.session_id)
     history = memory.get_recent_messages(session_id, limit=10)
     memory.save_message(session_id, "user", req.message)
@@ -126,7 +154,7 @@ def chat(req: ChatRequest, request: Request) -> dict:
                 span.event("respond", output=_UNAVAILABLE_REPLY)
                 memory.save_message(session_id, "assistant", _UNAVAILABLE_REPLY)
                 return {"session_id": session_id, "reply": _UNAVAILABLE_REPLY,
-                        "retrieval_scores": scores}
+                        "retrieval_scores": scores, "quick_replies": []}
         reply = result["content"] or ""
         tool_calls = result.get("tool_calls") or []
         for call in tool_calls:
@@ -174,7 +202,8 @@ def chat(req: ChatRequest, request: Request) -> dict:
         span.event("respond", output=reply)
         _cost.record(result["usage"], result["model"])
     memory.save_message(session_id, "assistant", reply)
-    return {"session_id": session_id, "reply": reply, "retrieval_scores": scores}
+    return {"session_id": session_id, "reply": reply, "retrieval_scores": scores,
+            "quick_replies": []}
 
 
 @router.get("/history")
