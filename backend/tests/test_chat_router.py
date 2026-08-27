@@ -1,12 +1,22 @@
 import json
 import logging
 from unittest.mock import patch, MagicMock
+import pytest
 from fastapi.testclient import TestClient
 from app.main import app
 from app.chat import router as chat_router
 from app import guardrails
 
 client = TestClient(app)
+
+
+@pytest.fixture(autouse=True)
+def generative_mode():
+    # BOT_MODE defaults to "faq", which branches away from the model pipeline before
+    # any of it runs. Every test in this file exercises the generative path, so pin
+    # the mode here (FAQ-mode routing is covered by test_chat_router_faq.py).
+    with patch.object(chat_router._settings, "BOT_MODE", "generative"):
+        yield
 
 
 @patch("app.chat.router.llm.chat_completion", return_value={
@@ -62,8 +72,9 @@ def test_lead_capture_success(mem, _ret, _llm, mock_capture):
     assert resp.status_code == 200
     body = resp.json()
 
-    # Response must have exactly the three frozen keys
-    assert set(body.keys()) == {"session_id", "reply", "retrieval_scores"}
+    # Response must have exactly the four frozen keys
+    assert set(body.keys()) == {"session_id", "reply", "retrieval_scores",
+                                "quick_replies"}
     assert body["session_id"] == "sess-lead-1"
     # Reply must be the confirmation string
     assert body["reply"] == (
@@ -99,8 +110,9 @@ def test_lead_capture_validation_reprompt(mem, _ret, _llm, mock_capture):
     assert resp.status_code == 200
     body = resp.json()
 
-    # Response shape must still be the frozen three keys
-    assert set(body.keys()) == {"session_id", "reply", "retrieval_scores"}
+    # Response shape must still be the frozen four keys
+    assert set(body.keys()) == {"session_id", "reply", "retrieval_scores",
+                                "quick_replies"}
     # Reply must contain the re-prompt text with the missing field info
     assert "missing required field: estimated_sheets" in body["reply"]
     assert "I still need a bit more info" in body["reply"]
@@ -120,7 +132,8 @@ def test_weak_retrieval_forces_escalation(mem, _ret, _llm):
     resp = client.post("/chat", json={"message": "what's the capital of France?"})
     assert resp.status_code == 200
     body = resp.json()
-    assert set(body.keys()) == {"session_id", "reply", "retrieval_scores"}
+    assert set(body.keys()) == {"session_id", "reply", "retrieval_scores",
+                                "quick_replies"}
     assert body["reply"] == chat_router._ESCALATION_REPLY
     assert "Here is an off-topic answer" not in body["reply"]
 
@@ -222,7 +235,8 @@ def test_malformed_tool_json_reprompts_not_500(mem, _ret, _llm, mock_capture):
                        headers={"X-Forwarded-For": "10.0.0.1"})
     assert resp.status_code == 200
     body = resp.json()
-    assert set(body.keys()) == {"session_id", "reply", "retrieval_scores"}
+    assert set(body.keys()) == {"session_id", "reply", "retrieval_scores",
+                                "quick_replies"}
     assert body["reply"] == chat_router._TOOL_REPROMPT_REPLY
     mock_capture.assert_not_called()
 
@@ -259,7 +273,8 @@ def test_capture_lead_unexpected_error_offers_contact_fallback(mem, _ret, _llm,
                            headers={"X-Forwarded-For": "10.0.0.3"})
     assert resp.status_code == 200
     body = resp.json()
-    assert set(body.keys()) == {"session_id", "reply", "retrieval_scores"}
+    assert set(body.keys()) == {"session_id", "reply", "retrieval_scores",
+                                "quick_replies"}
     # the human path is offered instead of a raw error
     assert "Info@GenerationConscious.co" in body["reply"]
     assert "(516) 619-6174" in body["reply"]
@@ -280,7 +295,8 @@ def test_double_llm_failure_returns_contact_info_not_500(mem, _ret, _llm):
                        headers={"X-Forwarded-For": "10.0.0.4"})
     assert resp.status_code == 200
     body = resp.json()
-    assert set(body.keys()) == {"session_id", "reply", "retrieval_scores"}
+    assert set(body.keys()) == {"session_id", "reply", "retrieval_scores",
+                                "quick_replies"}
     assert "Info@GenerationConscious.co" in body["reply"]
     assert body["retrieval_scores"] == [0.8]
     assert _llm.call_count == 2  # primary attempted, then fallback attempted
@@ -384,7 +400,8 @@ def test_cost_cap_returns_static_reply_without_calling_llm(mem, mock_llm):
                            headers={"X-Forwarded-For": "11.0.0.1"})
     assert resp.status_code == 200
     body = resp.json()
-    assert set(body.keys()) == {"session_id", "reply", "retrieval_scores"}
+    assert set(body.keys()) == {"session_id", "reply", "retrieval_scores",
+                                "quick_replies"}
     assert body["reply"] == ("I'm momentarily unavailable. Please email "
                              "Info@GenerationConscious.co and the team will help.")
     assert body["retrieval_scores"] == []
@@ -413,7 +430,8 @@ def test_primary_failure_retries_with_fallback_model(mem, _ret):
                            headers={"X-Forwarded-For": "11.0.0.2"})
     assert resp.status_code == 200
     body = resp.json()
-    assert set(body.keys()) == {"session_id", "reply", "retrieval_scores"}
+    assert set(body.keys()) == {"session_id", "reply", "retrieval_scores",
+                                "quick_replies"}
     # The reply comes from the fallback result, not an error message.
     assert body["reply"] == "Fallback answer."
     assert mock_llm.call_count == 2
