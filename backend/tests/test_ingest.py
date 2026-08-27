@@ -54,9 +54,9 @@ def test_ingest_deletes_only_rows_outside_new_hash_set(tmp_path, monkeypatch):
     with patch.object(ingest, "get_supabase", return_value=sb), \
          patch.object(ingest, "embed_batch", side_effect=_fake_vectors):
         ingest.ingest_all()
-    sb.table.return_value.delete.return_value.not_.in_.assert_called_once_with(
-        "content_hash", [expected_hash]
-    )
+    # The .eq hop is the managed_by='file' ownership filter the prune runs through.
+    sb.table.return_value.delete.return_value.eq.return_value.not_.in_ \
+        .assert_called_once_with("content_hash", [expected_hash])
 
 
 def test_ingest_failed_embed_leaves_db_untouched(tmp_path, monkeypatch):
@@ -138,4 +138,42 @@ def test_generative_mode_ingest_still_embeds(monkeypatch, tmp_path):
          patch("app.rag.ingest.embed_batch", return_value=[[0.1] * 1536]) as embed:
         ingest.ingest_all()
     embed.assert_called_once()
+    get_settings.cache_clear()
+
+
+def test_ingest_does_not_delete_portal_authored_entries(monkeypatch, tmp_path):
+    """Regression: FAQ entries Greg publishes from the portal must survive a re-ingest.
+
+    Before the managed_by fix, ingest deleted every row whose content_hash was not
+    derived from the markdown files — which is every entry written in the portal.
+    """
+    from app.config import get_settings
+    get_settings.cache_clear()
+    monkeypatch.setenv("BOT_MODE", "faq")
+    kb = tmp_path / "kb"
+    kb.mkdir()
+    (kb / "a.md").write_text("# Shipping\nWe ship via USPS.")
+    monkeypatch.setattr("app.rag.ingest.KB_DIR", kb)
+    sb = MagicMock()
+    with patch("app.rag.ingest.get_supabase", return_value=sb):
+        ingest.ingest_all()
+    # The prune must be scoped to file-managed rows, so portal rows are untouched.
+    sb.table.return_value.delete.return_value.eq.assert_called_once_with(
+        "managed_by", "file")
+    get_settings.cache_clear()
+
+
+def test_ingest_marks_its_own_rows_as_file_managed(monkeypatch, tmp_path):
+    from app.config import get_settings
+    get_settings.cache_clear()
+    monkeypatch.setenv("BOT_MODE", "faq")
+    kb = tmp_path / "kb"
+    kb.mkdir()
+    (kb / "a.md").write_text("# Shipping\nWe ship via USPS.")
+    monkeypatch.setattr("app.rag.ingest.KB_DIR", kb)
+    sb = MagicMock()
+    with patch("app.rag.ingest.get_supabase", return_value=sb):
+        ingest.ingest_all()
+    rows = sb.table.return_value.upsert.call_args[0][0]
+    assert rows and all(r["managed_by"] == "file" for r in rows)
     get_settings.cache_clear()
