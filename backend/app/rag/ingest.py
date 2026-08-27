@@ -68,12 +68,15 @@ def ingest_all() -> int:
             "content_hash": content_hash,
             "embedding": vector,
             "metadata": chunk["metadata"],
+            "managed_by": "file",
         })
     rows = list(rows_by_hash.values())
     sb = get_supabase()
     sb.table("kb_documents").upsert(rows, on_conflict="content_hash").execute()
-    # Only now remove rows that are no longer part of the KB.
-    sb.table("kb_documents").delete().not_.in_(
+    # Only now remove rows that are no longer part of the KB — and only rows this
+    # script owns. Portal-authored entries (managed_by='portal') are the team's
+    # work and must survive every re-ingest.
+    sb.table("kb_documents").delete().eq("managed_by", "file").not_.in_(
         "content_hash", list(rows_by_hash)
     ).execute()
     return len(rows)
