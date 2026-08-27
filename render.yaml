@@ -46,5 +46,9 @@ services:
         sync: false
       - key: DAILY_COST_CAP_USD
         sync: false
+      - key: AGENT_PASSWORD
+        sync: false
+      - key: AGENT_SESSION_SECRET
+        sync: false
 # Alternatives: Railway (railway.app) and Fly.io (fly.toml) work the same way —
 # any host that runs the Docker image (built from the repo root) and injects env vars + a /health check.
