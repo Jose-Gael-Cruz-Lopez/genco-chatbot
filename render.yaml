@@ -8,6 +8,8 @@ services:
     dockerContext: .
     healthCheckPath: /health
     envVars:
+      - key: BOT_MODE
+        sync: false
       - key: OPENROUTER_API_KEY
         sync: false
       - key: OPENROUTER_MODEL
