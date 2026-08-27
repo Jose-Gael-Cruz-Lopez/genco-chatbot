@@ -4,7 +4,8 @@ widget/test.html exercises the widget against the stub, so the stub's canned
 /chat and /history responses must keep exactly the same shape as the real
 FastAPI backend's frozen contracts:
 
-    POST /chat               -> {"session_id", "reply", "retrieval_scores"}
+    POST /chat               -> {"session_id", "reply", "retrieval_scores",
+                                 "quick_replies"}
     GET  /history?session_id -> {"session_id", "messages": [{"role", "content", "created_at"}]}
 
 The stub is started on an ephemeral loopback port; the real backend is served
@@ -23,6 +24,7 @@ from unittest.mock import patch
 import pytest
 from fastapi.testclient import TestClient
 
+from app.chat import router as chat_router
 from app.main import app
 
 _STUB_PATH = Path(__file__).resolve().parents[2] / "widget" / "stub_server.py"
@@ -33,6 +35,19 @@ stub_server = importlib.util.module_from_spec(_spec)
 _spec.loader.exec_module(stub_server)
 
 client = TestClient(app)
+
+# quick_replies is additive: the real backend sends it on every path, and the stub
+# picks it up with the widget's quick-reply rendering. Either way the stub must carry
+# the frozen core and invent no key the real backend does not send.
+_FROZEN_CHAT_KEYS = {"session_id", "reply", "retrieval_scores"}
+
+
+@pytest.fixture(autouse=True)
+def generative_mode():
+    # BOT_MODE defaults to "faq"; the real-backend half of these contract checks
+    # mocks the generative pipeline, so pin the mode the mocks belong to.
+    with patch.object(chat_router._settings, "BOT_MODE", "generative"):
+        yield
 
 
 @pytest.fixture(scope="module")
@@ -93,12 +108,15 @@ def test_stub_chat_matches_real_chat_schema(stub_port):
     stub = _stub_post_chat(stub_port, {"message": "buy sheets",
                                        "session_id": "contract-chat"})
     real = _real_chat_response()
-    assert set(stub) == set(real) == {"session_id", "reply", "retrieval_scores"}
+    assert set(real) == _FROZEN_CHAT_KEYS | {"quick_replies"}
+    assert _FROZEN_CHAT_KEYS <= set(stub) <= set(real)
     for body in (stub, real):
         assert isinstance(body["session_id"], str) and body["session_id"]
         assert isinstance(body["reply"], str) and body["reply"]
         assert isinstance(body["retrieval_scores"], list)
         assert all(isinstance(s, (int, float)) for s in body["retrieval_scores"])
+        assert isinstance(body.get("quick_replies", []), list)
+        assert all(isinstance(q, str) for q in body.get("quick_replies", []))
 
 
 def test_stub_history_matches_real_history_schema(stub_port):
@@ -126,3 +144,13 @@ def test_stub_buy_sheets_reply_uses_home_delivery_product_url(stub_port):
     assert "https://generationconscious.co/product/laundry-detergent-sheets/" in stub["reply"]
     assert "/checkout/" not in stub["reply"]
     assert "location-subscription" not in stub["reply"]
+
+
+def test_quick_replies_is_always_a_list_in_the_response():
+    # The widget renders data.quick_replies on every reply, so the key must be
+    # present and a list on every path — including generative turns, which never
+    # offer buttons and send an empty list.
+    body = _real_chat_response()
+    assert "quick_replies" in body
+    assert isinstance(body["quick_replies"], list)
+    assert body["quick_replies"] == []
