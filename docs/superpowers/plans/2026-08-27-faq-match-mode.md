@@ -45,7 +45,7 @@
 - Consumes: nothing.
 - Produces: `Settings.BOT_MODE: str` (default `"faq"`); SQL objects `kb_documents.content_tsv`, `match_documents_fts(query_text text, match_count int)`, `chat_sessions.flow_state jsonb`, table `faq_misses`.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Create `backend/tests/test_config_mode.py`:
 
@@ -69,12 +69,12 @@ def test_faq_mode_needs_no_ai_keys():
     assert s.OPENROUTER_API_KEY == ""
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `cd backend && python -m pytest tests/test_config_mode.py -v`
 Expected: FAIL — `AttributeError: 'Settings' object has no attribute 'BOT_MODE'`
 
-- [ ] **Step 3: Add the setting**
+- [x] **Step 3: Add the setting**
 
 In `backend/app/config.py`, add immediately after the `model_config` line:
 
@@ -85,12 +85,12 @@ In `backend/app/config.py`, add immediately after the `model_config` line:
     BOT_MODE: str = "faq"
 ```
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `cd backend && python -m pytest tests/test_config_mode.py -v`
 Expected: PASS (3 tests)
 
-- [ ] **Step 5: Extend the schema**
+- [x] **Step 5: Extend the schema**
 
 Append to `backend/app/rag/schema.sql` (the whole file must stay re-runnable):
 
@@ -136,7 +136,7 @@ create table if not exists faq_misses (
 create index if not exists faq_misses_created_idx on faq_misses(created_at desc);
 ```
 
-- [ ] **Step 6: Register the env var**
+- [x] **Step 6: Register the env var**
 
 In `.env.example`, add above the `# OpenRouter (chat generation)` line:
 
@@ -153,7 +153,7 @@ In `render.yaml`, add as the first entry under `envVars:`:
         sync: false
 ```
 
-- [ ] **Step 7: Run the full suite and commit**
+- [x] **Step 7: Run the full suite and commit**
 
 Run: `cd backend && python -m pytest tests/ -q`
 Expected: 111 passed, 2 skipped
@@ -178,7 +178,7 @@ git commit -m "feat: add BOT_MODE flag and FAQ-match schema (tsvector, flow_stat
   - `retrieve_fts(query: str, k: int = 5) -> list[dict]` — rows shaped `{id, content, metadata, similarity}`, best first.
   - `best_match(query: str, k: int = 5) -> tuple[dict | None, list[float]]` — `(top hit at/above FTS_MIN_RANK else None, all ranks)`.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Create `backend/tests/test_fts.py`:
 
@@ -246,12 +246,12 @@ def test_fts_module_makes_no_ai_calls():
         assert banned not in src.lower()
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `cd backend && python -m pytest tests/test_fts.py -v`
 Expected: FAIL — `ModuleNotFoundError: No module named 'app.rag.fts'`
 
-- [ ] **Step 3: Write the implementation**
+- [x] **Step 3: Write the implementation**
 
 Create `backend/app/rag/fts.py`:
 
@@ -297,12 +297,12 @@ def best_match(query: str, k: int = 5) -> tuple[dict | None, list[float]]:
     return None, scores
 ```
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `cd backend && python -m pytest tests/test_fts.py -v`
 Expected: PASS (7 tests)
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add backend/app/rag/fts.py backend/tests/test_fts.py
@@ -321,7 +321,7 @@ git commit -m "feat: add zero-AI full-text retrieval (rag/fts.py)"
 - Consumes: `chat_sessions.flow_state` from Task 1; the existing private `_is_uuid` helper.
 - Produces: `get_flow_state(session_id: str) -> dict | None`, `set_flow_state(session_id: str, state: dict | None) -> None`.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Append to `backend/tests/test_memory.py`:
 
@@ -388,12 +388,12 @@ def test_set_flow_state_ignores_non_uuid():
     sb.assert_not_called()
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `cd backend && python -m pytest tests/test_memory.py -v`
 Expected: FAIL — `AttributeError: module 'app.chat.memory' has no attribute 'get_flow_state'`
 
-- [ ] **Step 3: Write the implementation**
+- [x] **Step 3: Write the implementation**
 
 Append to `backend/app/chat/memory.py`:
 
@@ -422,12 +422,12 @@ def set_flow_state(session_id: str, state: dict | None) -> None:
      .update({"flow_state": state}).eq("id", session_id).execute())
 ```
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `cd backend && python -m pytest tests/test_memory.py -v`
 Expected: PASS (existing tests + 8 new)
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add backend/app/chat/memory.py backend/tests/test_memory.py
@@ -446,7 +446,7 @@ git commit -m "feat: persist FAQ flow state on chat_sessions"
 - Consumes: table `faq_misses` from Task 1.
 - Produces: `record_feedback(question: str, top_rank: float, answered: bool) -> None` — never raises.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Create `backend/tests/test_faq_misses.py`:
 
@@ -488,12 +488,12 @@ def test_never_raises_when_the_insert_fails():
         faq_misses.record_feedback("q", 0.1, answered=False)  # must not raise
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `cd backend && python -m pytest tests/test_faq_misses.py -v`
 Expected: FAIL — `ModuleNotFoundError: No module named 'app.faq_misses'`
 
-- [ ] **Step 3: Write the implementation**
+- [x] **Step 3: Write the implementation**
 
 Create `backend/app/faq_misses.py`:
 
@@ -529,12 +529,12 @@ def record_feedback(question: str, top_rank: float, answered: bool) -> None:
                       answered, top_rank)
 ```
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `cd backend && python -m pytest tests/test_faq_misses.py -v`
 Expected: PASS (4 tests)
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add backend/app/faq_misses.py backend/tests/test_faq_misses.py
@@ -556,7 +556,7 @@ git commit -m "feat: record FAQ hits and misses for the team's FAQ backlog"
   - Button-label constants `FEEDBACK_YES`, `FEEDBACK_NO`, `SEND_TO_TEAM`, `WHOLESALE_START`, `BUY_SHEETS`, `BUY_REFILL`, `ASK_TEAM`.
   - Flow-state shapes: `{"state": "awaiting_feedback", "question": str, "top_rank": float, "matched": bool}` and `{"state": "lead", "intent": str, "fields": dict}`. `None` means idle.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Create `backend/tests/test_flows.py`:
 
@@ -763,12 +763,12 @@ def test_flows_module_makes_no_ai_calls():
         assert banned not in src.lower()
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `cd backend && python -m pytest tests/test_flows.py -v`
 Expected: FAIL — `ModuleNotFoundError: No module named 'app.chat.flows'`
 
-- [ ] **Step 3: Write the implementation**
+- [x] **Step 3: Write the implementation**
 
 Create `backend/app/chat/flows.py`:
 
@@ -1007,12 +1007,12 @@ def _handle_lead_step(session_id: str, state: dict,
                      {"state": "lead", "intent": intent, "fields": fields})
 ```
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `cd backend && python -m pytest tests/test_flows.py -v`
 Expected: PASS (all tests)
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add backend/app/chat/flows.py backend/tests/test_flows.py
@@ -1033,7 +1033,7 @@ git commit -m "feat: add deterministic FAQ-mode conversation state machine"
 - Consumes: `flows.handle_turn` (Task 5), `memory.get_flow_state` / `memory.set_flow_state` (Task 3), `Settings.BOT_MODE` (Task 1).
 - Produces: `POST /chat` returning `{session_id, reply, retrieval_scores, quick_replies}` on every path.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Create `backend/tests/test_chat_router_faq.py`:
 
@@ -1113,12 +1113,12 @@ def test_rate_limit_still_applies_in_faq_mode(faq_client):
     assert r.json()["quick_replies"] == []
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `cd backend && python -m pytest tests/test_chat_router_faq.py -v`
 Expected: FAIL — `AttributeError: module 'app.chat.router' has no attribute 'flows'`
 
-- [ ] **Step 3: Wire the branch into the router**
+- [x] **Step 3: Wire the branch into the router**
 
 In `backend/app/chat/router.py`, add to the imports:
 
@@ -1193,12 +1193,12 @@ def chat(req: ChatRequest, request: Request) -> dict:
 
 Finally, add `"quick_replies": []` to the two remaining generative `return` statements (the double-model-failure return and the final success return), so every path returns the same four keys.
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `cd backend && python -m pytest tests/test_chat_router_faq.py -v`
 Expected: PASS (5 tests)
 
-- [ ] **Step 5: Extend the generative contract tests**
+- [x] **Step 5: Extend the generative contract tests**
 
 In `backend/tests/test_chat_router.py` and `backend/tests/test_widget_contract.py`, update every assertion on the response key set to include `quick_replies`, and add to `test_widget_contract.py`:
 
@@ -1210,7 +1210,7 @@ def test_quick_replies_is_always_a_list_in_the_response(...):
     assert isinstance(body["quick_replies"], list)
 ```
 
-- [ ] **Step 6: Run the full suite and commit**
+- [x] **Step 6: Run the full suite and commit**
 
 Run: `cd backend && python -m pytest tests/ -q`
 Expected: all pass, no generative regressions
@@ -1232,7 +1232,7 @@ git commit -m "feat: branch chat router on BOT_MODE and add quick_replies to the
 - Consumes: `Settings.BOT_MODE` (Task 1).
 - Produces: `ingest_all()` upserting `embedding=None` rows in FAQ mode, unchanged behavior in generative mode.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Append to `backend/tests/test_ingest.py`:
 
@@ -1273,12 +1273,12 @@ def test_generative_mode_ingest_still_embeds(monkeypatch, tmp_path):
 
 (Match the existing file's imports — add `from unittest.mock import MagicMock, patch` and `from app.rag import ingest` if not already present.)
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `cd backend && python -m pytest tests/test_ingest.py -v`
 Expected: FAIL — `embed.assert_not_called()` fails; embeddings are still requested
 
-- [ ] **Step 3: Write the implementation**
+- [x] **Step 3: Write the implementation**
 
 In `backend/app/rag/ingest.py`, add to the imports:
 
@@ -1298,12 +1298,12 @@ Replace the single `vectors = embed_batch(...)` line with:
         vectors = embed_batch([c["content"] for c in all_chunks])
 ```
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `cd backend && python -m pytest tests/test_ingest.py -v`
 Expected: PASS
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add backend/app/rag/ingest.py backend/tests/test_ingest.py
@@ -1323,7 +1323,7 @@ git commit -m "feat: skip embedding calls during ingest in FAQ mode"
 - Consumes: the `quick_replies` field from Task 6.
 - Produces: buttons rendered under any bot message that carries them.
 
-- [ ] **Step 1: Extract the quick-reply renderer**
+- [x] **Step 1: Extract the quick-reply renderer**
 
 In `widget/dist/widget.js`, replace the `greet()` function with a reusable renderer plus a greeting that uses it:
 
@@ -1347,7 +1347,7 @@ In `widget/dist/widget.js`, replace the `greet()` function with a reusable rende
   }
 ```
 
-- [ ] **Step 2: Render server-sent quick replies**
+- [x] **Step 2: Render server-sent quick replies**
 
 In the same file, inside `send()`'s `.then(function (data) {...})`, after the `bubble("bot", ...)` line, add:
 
@@ -1355,16 +1355,16 @@ In the same file, inside `send()`'s `.then(function (data) {...})`, after the `b
       quickReplies(data.quick_replies);
 ```
 
-- [ ] **Step 3: Add FAQ responses to the offline stub**
+- [x] **Step 3: Add FAQ responses to the offline stub**
 
 In `widget/stub_server.py`, make the `/chat` handler return `quick_replies` and drive a canned FAQ conversation: a matched answer with `["👍 Yes, that answered it", "✉️ No — ask the team"]`, a "No" tap that starts the guided question flow (question → name → email), and a final confirmation. Every stub response must include all four contract keys (`session_id`, `reply`, `retrieval_scores`, `quick_replies`). Follow the file's existing handler style.
 
-- [ ] **Step 4: Verify manually**
+- [x] **Step 4: Verify manually**
 
 Run: `cd widget && python stub_server.py` then open `http://localhost:5500/test.html?stub=1`
 Expected: greeting buttons appear; typing a question returns an answer with 👍/✉️ buttons; tapping ✉️ walks the guided question flow one field at a time and ends with a confirmation.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add widget/dist/widget.js widget/stub_server.py
@@ -1383,7 +1383,7 @@ git commit -m "feat: render server-sent quick replies in the widget and stub FAQ
 - Consumes: FAQ-mode `POST /chat` responses.
 - Produces: a FAQ fixture set runnable with `python eval/run_eval.py --mock`.
 
-- [ ] **Step 1: Add the fixtures**
+- [x] **Step 1: Add the fixtures**
 
 In `eval/run_eval.py`, add a FAQ-mode fixture set following the file's existing case structure. Each case is a question plus expected keyword(s) checked against the verbatim KB answer:
 
@@ -1394,12 +1394,12 @@ In `eval/run_eval.py`, add a FAQ-mode fixture set following the file's existing 
 - `"how do refill stations work"` → expects refill-station keywords
 - `"do you sell dog food"` → escalate case: expects the no-match offer (`couldn't find`)
 
-- [ ] **Step 2: Run the eval**
+- [x] **Step 2: Run the eval**
 
 Run: `python eval/run_eval.py --mock`
 Expected: all FAQ cases pass
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add eval/run_eval.py
@@ -1419,7 +1419,7 @@ git commit -m "test: add FAQ-mode eval fixtures"
 - Consumes: everything above.
 - Produces: docs that describe FAQ mode as the default.
 
-- [ ] **Step 1: Update the README**
+- [x] **Step 1: Update the README**
 
 - Lead with FAQ mode as the default and state the claim plainly: **no AI service is called; answers are the GC team's own words, verbatim.**
 - Shrink the go-live key list to **Supabase, Resend, Pipedrive** (plus the WordPress embed).
@@ -1428,11 +1428,11 @@ git commit -m "test: add FAQ-mode eval fixtures"
 - Cost section: FAQ mode ≈ **$0/month** in AI spend.
 - Document the `faq_misses` table as the FAQ backlog view.
 
-- [ ] **Step 2: Update VERIFICATION.md**
+- [x] **Step 2: Update VERIFICATION.md**
 
 Add FAQ-mode checks (match-quality spot-check against the seeded KB, feedback → email round-trip, guided lead flow end-to-end) and mark the existing generative checks (LangFuse tracing, cost cap, fallback model) as mode-conditional.
 
-- [ ] **Step 3: Update LAUNCH_CHECKLIST.md**
+- [x] **Step 3: Update LAUNCH_CHECKLIST.md**
 
 - Add: `BOT_MODE=faq` set in production.
 - Add: `schema.sql` re-applied in the Supabase SQL editor (adds `content_tsv`, `match_documents_fts`, `flow_state`, `faq_misses`).
@@ -1440,7 +1440,7 @@ Add FAQ-mode checks (match-quality spot-check against the seeded KB, feedback �
 - Add: FAQ feedback round-trip verified (tap "No" → lead lands in inbox + Pipedrive).
 - Move the AI-billing items (OpenRouter/OpenAI accounts, `DAILY_COST_CAP_USD`) and the LangFuse item off the critical path into a "generative mode only" section.
 
-- [ ] **Step 4: Run the full suite and commit**
+- [x] **Step 4: Run the full suite and commit**
 
 Run: `cd backend && python -m pytest tests/ -q`
 Expected: all pass
@@ -1454,8 +1454,8 @@ git commit -m "docs: document FAQ-match mode as the default"
 
 ## Definition of Done
 
-- [ ] `cd backend && python -m pytest tests/ -q` — all pass, no generative regressions.
-- [ ] `grep -ri "openrouter\|openai\|embed" backend/app/chat/flows.py backend/app/rag/fts.py` returns nothing.
-- [ ] With `BOT_MODE=faq` and every AI key blank, the app boots and answers a question.
-- [ ] `POST /chat` returns all four contract keys on every path, always HTTP 200.
-- [ ] `widget/test.html?stub=1` walks the full flow: greeting → answer → feedback → guided lead → confirmation.
+- [x] `cd backend && python -m pytest tests/ -q` — all pass, no generative regressions.
+- [x] `grep -ri "openrouter\|openai\|embed" backend/app/chat/flows.py backend/app/rag/fts.py` returns nothing.
+- [x] With `BOT_MODE=faq` and every AI key blank, the app boots and answers a question.
+- [x] `POST /chat` returns all four contract keys on every path, always HTTP 200.
+- [x] `widget/test.html?stub=1` walks the full flow: greeting → answer → feedback → guided lead → confirmation.
