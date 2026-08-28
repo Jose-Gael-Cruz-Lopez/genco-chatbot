@@ -50,5 +50,11 @@ services:
         sync: false
       - key: AGENT_SESSION_SECRET
         sync: false
+      - key: AGENT_HEARTBEAT_TTL_SECONDS
+        sync: false
+      - key: LIVE_ACCEPT_TIMEOUT_SECONDS
+        sync: false
+      - key: LIVE_VISITOR_IDLE_SECONDS
+        sync: false
 # Alternatives: Railway (railway.app) and Fly.io (fly.toml) work the same way —
 # any host that runs the Docker image (built from the repo root) and injects env vars + a /health check.
