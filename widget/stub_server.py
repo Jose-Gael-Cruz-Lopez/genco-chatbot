@@ -4,8 +4,13 @@ Serves canned versions of the two frozen widget endpoints with permissive CORS
 so the full conversation UI (greeting, quick replies, typing indicator, reply
 bubbles, reload-rehydrate) can be exercised without Supabase/OpenRouter keys:
 
-    POST /chat               -> {"session_id", "reply", "retrieval_scores", "quick_replies"}
+    POST /chat               -> {"session_id", "reply", "retrieval_scores", "quick_replies", "live"}
     GET  /history?session_id -> {"session_id", "messages": [{"role", "content", "created_at"}]}
+    GET  /live/messages      -> {"messages", "ended", "reason", "notice", "error"}
+
+The stub has no agent behind it, so `live` is always false and /live/messages
+always reports the chat as ended: the widget's polling loop therefore stops on
+its first tick instead of hammering a stub that will never answer.
 
 The canned conversation mirrors FAQ-match mode (BOT_MODE=faq): a keyword-matched
 answer comes back with 👍/✉️ feedback buttons, tapping ✉️ walks the guided lead
@@ -171,8 +176,20 @@ def _turn(session_id: str, message: str) -> tuple[str, list[str]]:
     return _NO_MATCH_REPLY, [_SEND_TO_TEAM]
 
 
+# No agent is ever online behind the stub, so a poll always says the chat is
+# over — the same well-formed body the real backend returns for an unknown
+# session, which is what stops the widget's live poll.
+_LIVE_IDLE: dict[str, object] = {
+    "messages": [],
+    "ended": True,
+    "reason": None,
+    "notice": None,
+    "error": False,
+}
+
+
 class StubHandler(BaseHTTPRequestHandler):
-    """Canned /chat and /history with permissive CORS."""
+    """Canned /chat, /history and /live/messages with permissive CORS."""
 
     def _send_json(self, body: dict[str, object], status: int = 200) -> None:
         data = json.dumps(body).encode()
@@ -195,6 +212,9 @@ class StubHandler(BaseHTTPRequestHandler):
 
     def do_GET(self) -> None:  # noqa: N802
         parsed = urlparse(self.path)
+        if parsed.path == "/live/messages":
+            self._send_json(dict(_LIVE_IDLE))
+            return
         if parsed.path != "/history":
             self._send_json({"detail": "not found"}, status=404)
             return
@@ -230,6 +250,8 @@ class StubHandler(BaseHTTPRequestHandler):
             "reply": reply,
             "retrieval_scores": [0.91, 0.84, 0.42],
             "quick_replies": quick_replies,
+            # Never true offline: nobody is at the other end of the stub.
+            "live": False,
         })
 
     def log_message(self, format: str, *args: object) -> None:  # noqa: A002 (http.server API)
@@ -240,8 +262,8 @@ def main() -> None:
     port = int(sys.argv[1]) if len(sys.argv) > 1 else 8000
     server = ThreadingHTTPServer(("127.0.0.1", port), StubHandler)
     print(
-        f"Genco stub backend on http://localhost:{port} — POST /chat, GET /history "
-        "(Ctrl-C to stop)"
+        f"Genco stub backend on http://localhost:{port} — POST /chat, GET /history, "
+        "GET /live/messages (Ctrl-C to stop)"
     )
     try:
         server.serve_forever()
