@@ -44,7 +44,7 @@ This is the data-loss bug. Do it first, before anything can write a portal-autho
 - Consumes: nothing.
 - Produces: `kb_documents.managed_by text not null default 'file'`; `faq_misses.resolved boolean not null default false`; `ingest_all()` that prunes only `managed_by='file'` rows.
 
-- [ ] **Step 1: Write the failing regression test**
+- [x] **Step 1: Write the failing regression test**
 
 Append to `backend/tests/test_ingest.py`:
 
@@ -87,12 +87,12 @@ def test_ingest_marks_its_own_rows_as_file_managed(monkeypatch, tmp_path):
     get_settings.cache_clear()
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `cd backend && python -m pytest tests/test_ingest.py -k portal_authored -v`
 Expected: FAIL — `AssertionError: Expected 'eq' to be called once. Called 0 times.`
 
-- [ ] **Step 3: Extend the schema**
+- [x] **Step 3: Extend the schema**
 
 Append to `backend/app/rag/schema.sql`:
 
@@ -110,7 +110,7 @@ alter table faq_misses add column if not exists resolved boolean not null defaul
 create index if not exists faq_misses_unresolved_idx on faq_misses(resolved, created_at desc);
 ```
 
-- [ ] **Step 4: Fix ingest**
+- [x] **Step 4: Fix ingest**
 
 In `backend/app/rag/ingest.py`, add `"managed_by": "file",` to the dict inside `rows_by_hash.setdefault(...)`, immediately after the `"metadata"` key.
 
@@ -125,12 +125,12 @@ Then replace the prune block:
     ).execute()
 ```
 
-- [ ] **Step 5: Run tests to verify they pass**
+- [x] **Step 5: Run tests to verify they pass**
 
 Run: `cd backend && python -m pytest tests/test_ingest.py -v`
 Expected: PASS (all, including both new tests)
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add backend/app/rag/schema.sql backend/app/rag/ingest.py backend/tests/test_ingest.py
@@ -151,7 +151,7 @@ git commit -m "fix: stop ingest deleting portal-authored FAQ entries"
 - Consumes: nothing.
 - Produces: `Settings.AGENT_PASSWORD: str` (default `""`), `Settings.AGENT_SESSION_SECRET: str` (default `""`).
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Append to `backend/tests/test_config_mode.py`:
 
@@ -170,12 +170,12 @@ def test_agent_portal_settings_read_env(monkeypatch):
     assert s.AGENT_SESSION_SECRET == "s3cret"
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `cd backend && python -m pytest tests/test_config_mode.py -k agent_portal -v`
 Expected: FAIL — `AttributeError: 'Settings' object has no attribute 'AGENT_PASSWORD'`
 
-- [ ] **Step 3: Add the settings**
+- [x] **Step 3: Add the settings**
 
 In `backend/app/config.py`, add after the `PIPEDRIVE_DOMAIN` line:
 
@@ -187,12 +187,12 @@ In `backend/app/config.py`, add after the `PIPEDRIVE_DOMAIN` line:
     AGENT_SESSION_SECRET: str = ""
 ```
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `cd backend && python -m pytest tests/test_config_mode.py -v`
 Expected: PASS
 
-- [ ] **Step 5: Register the env vars**
+- [x] **Step 5: Register the env vars**
 
 In `.env.example`, append:
 
@@ -214,7 +214,7 @@ In `render.yaml`, add under `envVars:`:
         sync: false
 ```
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add backend/app/config.py backend/tests/test_config_mode.py .env.example render.yaml
@@ -240,7 +240,7 @@ git commit -m "feat: add agent portal settings"
   - `token_valid(token: str | None, now: float | None = None) -> bool`
   - `require_agent(request: Request) -> None` — raises `HTTPException(503)` when disabled, `HTTPException(401)` when unauthenticated.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Create `backend/tests/test_agent_auth.py`:
 
@@ -346,12 +346,12 @@ def test_require_agent_503s_when_portal_disabled(monkeypatch):
     assert e.value.status_code == 503
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `cd backend && python -m pytest tests/test_agent_auth.py -v`
 Expected: FAIL — `ModuleNotFoundError: No module named 'app.agent'`
 
-- [ ] **Step 3: Write the implementation**
+- [x] **Step 3: Write the implementation**
 
 Create `backend/app/agent/__init__.py` as an empty file.
 
@@ -446,12 +446,12 @@ def require_agent(request: Request) -> None:
         raise HTTPException(status_code=401, detail="Not signed in.")
 ```
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `cd backend && python -m pytest tests/test_agent_auth.py -v`
 Expected: PASS (13 tests)
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add backend/app/agent/ backend/tests/test_agent_auth.py
@@ -472,7 +472,7 @@ git commit -m "feat: add agent portal authentication (stdlib signed cookie)"
   - `list_gaps(limit: int = 50) -> list[dict]` — each `{"question": str, "count": int, "ids": list[str], "last_asked": str}`, most-asked first.
   - `publish_entry(title: str, content: str, resolve_ids: list[str]) -> dict` — upserts a `managed_by='portal'` row into `kb_documents` and marks those `faq_misses` rows resolved. Raises `ValueError` on blank title or content.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Create `backend/tests/test_faq_gaps.py`:
 
@@ -570,12 +570,12 @@ def test_publish_upserts_so_a_corrected_answer_replaces_the_old_one():
     assert sb.table.return_value.upsert.call_args.kwargs["on_conflict"] == "content_hash"
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `cd backend && python -m pytest tests/test_faq_gaps.py -v`
 Expected: FAIL — `ModuleNotFoundError: No module named 'app.agent.faq_gaps'`
 
-- [ ] **Step 3: Write the implementation**
+- [x] **Step 3: Write the implementation**
 
 Create `backend/app/agent/faq_gaps.py`:
 
@@ -667,12 +667,12 @@ def publish_entry(title: str, content: str, resolve_ids: list[str]) -> dict:
     return row
 ```
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `cd backend && python -m pytest tests/test_faq_gaps.py -v`
 Expected: PASS (8 tests)
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add backend/app/agent/faq_gaps.py backend/tests/test_faq_gaps.py
@@ -692,7 +692,7 @@ git commit -m "feat: group FAQ gaps and publish answers to the knowledge base"
 - Consumes: `app.agent.auth` (Task 3), `app.agent.faq_gaps` (Task 4).
 - Produces: router mounted in `main.py` exposing `POST /agent/login`, `POST /agent/logout`, `GET /agent/faq-gaps`, `POST /agent/faq-entry`.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Create `backend/tests/test_agent_routes.py`:
 
@@ -804,12 +804,12 @@ def test_login_is_rate_limited(client):
     assert client.post("/agent/login", json={"password": "hunter2"}).status_code == 429
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `cd backend && python -m pytest tests/test_agent_routes.py -v`
 Expected: FAIL — `ModuleNotFoundError: No module named 'app.agent.router'`
 
-- [ ] **Step 3: Write the implementation**
+- [x] **Step 3: Write the implementation**
 
 Create `backend/app/agent/router.py`:
 
@@ -908,12 +908,12 @@ from app.agent.router import router as agent_router
 app.include_router(agent_router)
 ```
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `cd backend && python -m pytest tests/test_agent_routes.py -v`
 Expected: PASS (10 tests)
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add backend/app/agent/router.py backend/app/main.py backend/tests/test_agent_routes.py
@@ -934,7 +934,7 @@ git commit -m "feat: add agent portal routes (login, FAQ gaps, publishing)"
 - Consumes: the routes from Task 5.
 - Produces: `GET /agent` serving the portal HTML.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Append to `backend/tests/test_agent_routes.py`:
 
@@ -946,12 +946,12 @@ def test_portal_page_is_served_at_agent(client):
     assert "Generation Conscious" in r.text
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `cd backend && python -m pytest tests/test_agent_routes.py -k portal_page -v`
 Expected: FAIL — 404, the route does not exist
 
-- [ ] **Step 3: Serve the page**
+- [x] **Step 3: Serve the page**
 
 In `backend/app/main.py`, replace the widget mount block with:
 
@@ -979,7 +979,7 @@ In `backend/Dockerfile`, add after the widget COPY line:
 COPY portal/dist /portal/dist
 ```
 
-- [ ] **Step 4: Write the portal page**
+- [x] **Step 4: Write the portal page**
 
 Create `portal/dist/portal.html`. It is one self-contained file — no build step, no framework, no external requests (the artifact CSP equivalent here is simply that the backend serves it offline-capable).
 
@@ -998,12 +998,12 @@ Requirements this file must meet, all of them testable by hand:
 
 Use the same visual language as the widget: `#FF0719` primary, system font stack, white surface, simple flat controls. Keep it under ~250 lines.
 
-- [ ] **Step 5: Run test to verify it passes**
+- [x] **Step 5: Run test to verify it passes**
 
 Run: `cd backend && python -m pytest tests/test_agent_routes.py -v`
 Expected: PASS (11 tests)
 
-- [ ] **Step 6: Verify by hand**
+- [x] **Step 6: Verify by hand**
 
 ```bash
 cd backend && AGENT_PASSWORD=test AGENT_SESSION_SECRET=devsecret \
@@ -1012,7 +1012,7 @@ cd backend && AGENT_PASSWORD=test AGENT_SESSION_SECRET=devsecret \
 
 Open `http://localhost:8877/agent`. Confirm: wrong password is rejected; the right one signs in; the gaps list renders (empty state is fine without a database); sign-out returns to login.
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add portal/dist/portal.html backend/app/main.py backend/Dockerfile backend/tests/test_agent_routes.py
@@ -1028,19 +1028,19 @@ git commit -m "feat: add the agent portal page with the FAQ gaps pane"
 - Modify: `VERIFICATION.md`
 - Modify: `LAUNCH_CHECKLIST.md`
 
-- [ ] **Step 1: Update the README**
+- [x] **Step 1: Update the README**
 
 Add an "Agent portal" section covering: what `/agent` is, the two secrets and how to generate `AGENT_SESSION_SECRET`, and — most importantly — the **two sources of knowledge**: markdown files in `backend/knowledge_base/` are owned by ingest (`managed_by='file'`), entries published in the portal are owned by the database (`managed_by='portal'`) and survive every re-ingest. Say plainly that portal entries are edited in the portal and file entries in the repo.
 
-- [ ] **Step 2: Update VERIFICATION.md**
+- [x] **Step 2: Update VERIFICATION.md**
 
 Add: sign in at `/agent`; publish an answer for a gap; confirm the gap disappears; ask the bot that question and confirm the new answer comes back; **re-run `python -m app.rag.ingest` and confirm the published entry still exists** (the regression this plan exists to prevent).
 
-- [ ] **Step 3: Update LAUNCH_CHECKLIST.md**
+- [x] **Step 3: Update LAUNCH_CHECKLIST.md**
 
 Add to the Mode & Database section: `schema.sql` re-applied for `managed_by` and `resolved`. Add a new "Agent portal" section: `AGENT_PASSWORD` and `AGENT_SESSION_SECRET` set in production, `/agent` reachable over HTTPS, and a wrong password rejected.
 
-- [ ] **Step 4: Run the full suite and commit**
+- [x] **Step 4: Run the full suite and commit**
 
 Run: `cd backend && python -m pytest tests/ -q`
 Expected: all pass
@@ -1054,9 +1054,9 @@ git commit -m "docs: document the agent portal and knowledge ownership"
 
 ## Definition of Done
 
-- [ ] `cd backend && python -m pytest tests/ -q` — all pass, baseline of 161 not regressed.
-- [ ] `grep -rn "innerHTML" portal/dist/portal.html` returns nothing.
-- [ ] `grep -rniE "openrouter|openai|embed" backend/app/agent/` returns nothing.
-- [ ] With both agent secrets unset, `GET /agent/faq-gaps` returns 503 and the rest of the app is unaffected.
-- [ ] Signing in, publishing an answer, and seeing the gap clear all work by hand.
-- [ ] A published entry survives `python -m app.rag.ingest`.
+- [x] `cd backend && python -m pytest tests/ -q` — all pass, baseline of 161 not regressed.
+- [x] `grep -rn "innerHTML" portal/dist/portal.html` returns nothing.
+- [x] `grep -rniE "openrouter|openai|embed" backend/app/agent/` returns nothing.
+- [x] With both agent secrets unset, `GET /agent/faq-gaps` returns 503 and the rest of the app is unaffected.
+- [x] Signing in, publishing an answer, and seeing the gap clear all work by hand.
+- [x] A published entry survives `python -m app.rag.ingest`.
