@@ -25,6 +25,11 @@ entirely unless you are deliberately launching with `BOT_MODE=generative`.
   (`text not null default 'file'`) and `faq_misses.resolved` (`boolean not null default false`).
   Confirm both exist in the Table Editor **before** anyone publishes from the portal — without
   `managed_by`, the next re-ingest deletes every published answer.
+- [ ] That same re-apply added the **live chat tables**: `agent_presence` (exactly one row — the
+  availability heartbeat) and `live_chats` (one row per conversation, with its `status` and
+  `ended_reason`). Both are needed before the portal's Live pane is used. Missing them is safe
+  rather than dangerous — the availability lookup fails **closed**, so visitors get the email flow
+  — but live chat simply will not work until they exist.
 - [ ] KB re-ingested **after** the schema change so every chunk is searchable:
   ```bash
   cd backend && python -m app.rag.ingest
@@ -119,9 +124,9 @@ entirely unless you are deliberately launching with `BOT_MODE=generative`.
 ## Agent portal
 
 `/agent` is the team's side of the bot: every question the FAQ could not answer, each with a
-**Publish to FAQ** box that turns it into a permanent entry. It fails closed — with either secret
-blank, every `/agent/*` API route returns 503, the login page says so, and the visitor chat is
-untouched.
+**Publish to FAQ** box that turns it into a permanent entry, plus a **Live** pane for talking to a
+visitor in real time. It fails closed — with either secret blank, every `/agent/*` API route returns
+503, the login page says so, and the visitor chat is untouched.
 
 - [ ] `AGENT_PASSWORD` and `AGENT_SESSION_SECRET` are both set in the production environment
   (Render → Environment; both are `sync: false` in `render.yaml`). Generate the secret with
@@ -143,6 +148,35 @@ untouched.
 - [ ] Whoever edits the knowledge base knows the split: **portal entries are edited in the portal,
   `backend/knowledge_base/*.md` entries in the repo** (README → Two sources of knowledge).
 
+### Live chat
+
+Live chat is offered to a visitor **only** while someone has the portal open with the availability
+toggle **on**. Off is the normal state and a complete, shippable configuration — leave it off and
+everything below except the first box is optional.
+
+- [ ] **With the toggle off, a visitor gets today's email flow, unchanged.** Ask something the KB
+  cannot answer and tap "✉️ Send my question to the team": the bot asks for name → email and
+  captures a `question` lead, with no "someone from our team is online" offer anywhere, and
+  `/chat` returns `"live": false` on every turn (VERIFICATION check 14, step 0). **No visitor may
+  ever be offered a human who isn't there** — this box is not optional even if live chat is never
+  turned on.
+- [ ] The availability toggle expires on its own: closing the portal tab takes the team offline
+  within `AGENT_HEARTBEAT_TTL_SECONDS` (45s — three missed 15-second heartbeats). Confirm
+  `agent_presence.last_seen_at` advances while the Live pane is open and stops when it closes, so
+  nobody can leave themselves "available" overnight and strand a visitor.
+- [ ] One real live chat has been run end to end **against production**: visitor question → the
+  team's reply arrives in the widget labelled as a person, not the bot → **End chat**
+  (VERIFICATION check 14, step 2). Confirm the bot stays silent for the whole conversation.
+- [ ] **All four endings produce a lead email carrying the transcript** — `agent_ended`,
+  `agent_dropped` (portal tab closed mid-chat), `not_accepted` (nobody opened it within
+  `LIVE_ACCEPT_TIMEOUT_SECONDS`, 60s) and `visitor_left` (no visitor poll for
+  `LIVE_VISITOR_IDLE_SECONDS`, 120s). One chat → one lead → one email, exactly once
+  (VERIFICATION check 14, steps 2–6). **A chat that can end without a notified lead is not
+  launchable**; that guarantee is the only reason offering live chat is safe.
+- [ ] Whoever staffs the portal knows the deal: while the toggle is on, a waiting chat nobody opens
+  within a minute ends itself and emails the team instead. Turn the toggle off when stepping away —
+  or just close the tab, which does the same within 45 seconds.
+
 ---
 
 ## QA
@@ -153,6 +187,8 @@ untouched.
   Chrome and Safari/Firefox.
 - [ ] Guided-flow QA (VERIFICATION check 12): an invalid email re-prompts without advancing, a
   non-numeric count re-prompts, and typing "cancel" exits to the greeting buttons.
+- [ ] If live chat will be used: the agent bubbles render distinctly on mobile and desktop, and
+  ending the chat returns the widget to ordinary FAQ answers on the next message.
 
 ---
 
@@ -173,4 +209,6 @@ deliberately launched with `BOT_MODE=generative`, which calls OpenRouter and Ope
 
 ---
 
-All boxes outside the generative-mode section checked = cleared for launch.
+All boxes outside the generative-mode section checked = cleared for launch. The **Live chat** boxes
+beyond the first are needed only if the team will actually staff the portal's Live pane; the first
+one — a visitor gets the unchanged email flow while the toggle is off — applies either way.
