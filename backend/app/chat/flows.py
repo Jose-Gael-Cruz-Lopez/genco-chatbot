@@ -8,6 +8,13 @@ Flow states (persisted as chat_sessions.flow_state; None means idle):
   {"state": "awaiting_feedback", "question": str, "top_rank": float,
    "matched": bool}
   {"state": "lead", "intent": str, "fields": dict}
+  {"state": "awaiting_live_consent", "question": str}
+  {"state": "live_collect_email", "question": str}
+  {"state": "live", "chat_id": str, "question": str}
+
+The three live states are only ever reachable while the team's heartbeat is
+fresh; with nobody online this module behaves exactly as it did before live chat
+existed. Live chat is humans typing — no model is called from these states either.
 """
 import logging
 import re
@@ -15,6 +22,8 @@ import re
 from app import faq_misses
 from app.chat.tools import FIELD_LABELS, REQUIRED_FIELDS
 from app.escalation import capture_lead
+from app.live.chats import start_chat
+from app.live.presence import is_agent_available
 from app.rag.fts import best_match
 
 log = logging.getLogger(__name__)
@@ -27,6 +36,8 @@ WHOLESALE_START = "Start wholesale inquiry"
 BUY_SHEETS = "Buy Sheets"
 BUY_REFILL = "Buy Refill Stations"
 ASK_TEAM = "Question for the team"
+CHAT_NOW = "\U0001F4AC Chat with the team now"
+JUST_EMAIL = "✉️ Just email me"
 
 PRODUCT_URL = "https://generationconscious.co/product/laundry-detergent-sheets/"
 CONTACT = "Info@GenerationConscious.co or text (516) 619-6174"
@@ -50,6 +61,19 @@ _THANKS_REPLY = "Glad that helped! Anything else I can look up for you?"
 # question appearing out of nowhere (spec motivation, point 2).
 _HANDOFF_LEAD_IN = "No problem — I'll pass this to our team so they can answer you personally."
 _CANCEL_REPLY = "No problem — that's cancelled. What else can I help you with?"
+# ── Live chat copy ────────────────────────────────────────────────────────
+_LIVE_OFFER = ("Good news — someone from our team is online right now. Would you "
+               "like to talk to them directly?")
+_LIVE_EMAIL_PROMPT = ("Great — what's your email address? That way they can "
+                      "follow up if you get cut off.")
+_LIVE_CONNECTING = "Thanks — connecting you to our team now…"
+# Shown when we offered a person and then couldn't open the conversation. The
+# visitor was just promised a human, so give them the direct contact as well as
+# falling back to the ordinary email flow.
+_LIVE_FAILED_LEAD_IN = (
+    "Sorry — I couldn't connect you to the team just now. You can always reach "
+    f"them at {CONTACT}. Let me take your details so they can follow up too."
+)
 _LEAD_DONE = {
     "question": ("Thanks — I've sent your question to our team. They usually "
                  "reply the same day."),
@@ -143,6 +167,15 @@ def handle_turn(session_id: str, message: str,
     name = (state or {}).get("state")
     if name == "awaiting_feedback":
         return _handle_feedback(session_id, state or {}, text, norm)
+    if name == "awaiting_live_consent":
+        return _handle_live_consent(session_id, state or {}, text, norm)
+    if name == "live_collect_email":
+        return _handle_live_email(session_id, state or {}, text)
+    if name == "live":
+        # The visitor is talking to a person. The router has already stored their
+        # message for the agent to read; matching it against the FAQ here would
+        # answer over the top of a human conversation.
+        return "", [], state, []
     if name == "lead":
         return _handle_lead_step(session_id, state or {}, text)
     if name is not None:
@@ -191,12 +224,58 @@ def _handle_feedback(session_id: str, state: dict, text: str,
         if matched:
             faq_misses.record_feedback(question, top, answered=False)
         prefill = {"question": question} if question else {}
+        # Offer a person only when one is actually here; otherwise this is exactly
+        # the email flow it has always been.
+        if is_agent_available():
+            return _offer_live(question)
         return _start_lead(session_id, "question", prefill, lead_in=_HANDOFF_LEAD_IN)
     if norm == _norm(WHOLESALE_START):
         return _start_lead(session_id, "wholesale", {})
     # Only explicit Yes/No taps are recorded as feedback; anything else typed is
     # simply a new question.
     return _handle_idle(session_id, text, norm)
+
+
+def _offer_live(question: str) -> tuple[str, list[str], dict | None, list[float]]:
+    return (_LIVE_OFFER, [CHAT_NOW, JUST_EMAIL],
+            {"state": "awaiting_live_consent", "question": question}, [])
+
+
+def _handle_live_consent(session_id: str, state: dict, text: str,
+                         norm: str) -> tuple[str, list[str], dict | None, list[float]]:
+    question = state.get("question") or ""
+    if norm == _norm(CHAT_NOW):
+        return (_LIVE_EMAIL_PROMPT, [],
+                {"state": "live_collect_email", "question": question}, [])
+    if norm == _norm(JUST_EMAIL):
+        prefill = {"question": question} if question else {}
+        return _start_lead(session_id, "question", prefill,
+                           lead_in=_HANDOFF_LEAD_IN)
+    return _handle_idle(session_id, text, norm)
+
+
+def _handle_live_email(session_id: str, state: dict,
+                       text: str) -> tuple[str, list[str], dict | None, list[float]]:
+    question = state.get("question") or ""
+    ok, reprompt = _validate_field("email", text)
+    if not ok:
+        return reprompt, [], state, []
+    try:
+        # Stored now so the visitor is reachable even if they close the tab
+        # mid-sentence; notified when the chat ends, with the transcript attached.
+        lead = capture_lead(session_id, "question",
+                            {"name": "Website visitor", "email": text.strip(),
+                             "question": question or "Live chat request"},
+                            notify=False)
+        chat = start_chat(session_id, question, lead.get("id"))
+    except Exception:
+        # Never start a conversation we cannot follow up on.
+        log.exception("could not open a live chat; falling back to the email flow")
+        return _start_lead(session_id, "question",
+                           {"question": question} if question else {},
+                           lead_in=_LIVE_FAILED_LEAD_IN)
+    return (_LIVE_CONNECTING, [],
+            {"state": "live", "chat_id": chat.get("id"), "question": question}, [])
 
 
 def _start_lead(session_id: str, intent: str, fields: dict,
