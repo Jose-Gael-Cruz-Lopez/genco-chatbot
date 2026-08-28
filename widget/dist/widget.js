@@ -36,6 +36,10 @@
     ".gc-b{max-width:80%;padding:9px 12px;border-radius:12px;line-height:1.4;white-space:pre-wrap;word-wrap:break-word}" +
     ".gc-user{align-self:flex-end;background:" + PRIMARY + ";color:#fff}" +
     ".gc-bot{align-self:flex-start;background:#f0f0f0;color:#111}" +
+    /* A human's turn must never be mistaken for the bot's: green bubble plus a
+     * "who's talking" caption above it. */
+    ".gc-agent{align-self:flex-start;background:#EAF3EE;color:#111;border:1px solid #CFE3D7}" +
+    ".gc-who{align-self:flex-start;font-size:11px;color:#888;margin-bottom:-6px}" +
     ".gc-qr{display:flex;flex-wrap:wrap;gap:8px}.gc-qr button{border:1px solid " + PRIMARY + ";color:" + PRIMARY + ";background:#fff;border-radius:16px;padding:7px 12px;cursor:pointer}" +
     ".gc-input{display:flex;border-top:1px solid #eee}.gc-input input{flex:1;border:0;padding:14px;font-size:14px;outline:none}" +
     ".gc-input button{border:0;background:" + PRIMARY + ";color:#fff;padding:0 18px;cursor:pointer}" +
@@ -85,10 +89,19 @@
 
   var sessionId = storeGet(KEY);
   var greeted = false;
+  var livePoll = null, liveCursor = null, liveErrors = 0;
 
+  /* Agent text is typed by a person, so like every other bubble it is inserted
+   * with textContent — never innerHTML. */
   function bubble(role, text) {
+    if (role === "agent") {
+      var who = document.createElement("div");
+      who.className = "gc-who"; who.textContent = "Generation Conscious team";
+      msgs.appendChild(who);
+    }
     var d = document.createElement("div");
-    d.className = "gc-b " + (role === "user" ? "gc-user" : "gc-bot");
+    d.className = "gc-b " + (role === "user" ? "gc-user"
+                             : role === "agent" ? "gc-agent" : "gc-bot");
     d.textContent = text; msgs.appendChild(d); msgs.scrollTop = msgs.scrollHeight;
   }
   /* Buttons under a bot message. Labels are set with textContent (never
@@ -131,12 +144,54 @@
     }).then(function (data) {
       typing.remove();
       if (data.session_id) { sessionId = data.session_id; storeSet(KEY, sessionId); }
-      bubble("bot", data.reply || FRIENDLY_ERROR);
+      /* An empty reply is normal mid-live-chat — the bot stays quiet while a
+       * person is talking — so it must not surface the error bubble. */
+      if (data.reply) { bubble("bot", data.reply); }
+      else if (!data.live) { bubble("bot", FRIENDLY_ERROR); }
       quickReplies(data.quick_replies);
+      if (data.live) { startLive(); } else { stopLive(); }
     }).catch(function () {
       typing.remove();
       bubble("bot", FRIENDLY_ERROR);
     });
+  }
+
+  /* While a live chat is open the bot stays quiet and the team's replies arrive
+   * here. Polling (rather than a socket) means a backend restart mid-conversation
+   * is invisible: the state lives in the database, not in a connection. */
+  function startLive() {
+    if (livePoll) return;
+    liveErrors = 0;
+    livePoll = setInterval(pollLive, 2000);
+  }
+  function stopLive() {
+    if (livePoll) { clearInterval(livePoll); livePoll = null; }
+  }
+  function pollLive() {
+    var url = BACKEND_URL + "/live/messages?session_id=" + encodeURIComponent(sessionId) +
+      (liveCursor ? "&after=" + encodeURIComponent(liveCursor) : "");
+    fetch(url).then(function (r) {
+      if (!r.ok) { throw new Error("HTTP " + r.status); }
+      return r.json();
+    }).then(function (data) {
+      if (data.error) { liveErrors++; if (liveErrors >= 5) { giveUpLive(); } return; }
+      liveErrors = 0;
+      (data.messages || []).forEach(function (m) {
+        bubble("agent", m.content);
+        liveCursor = m.created_at || liveCursor;
+      });
+      if (data.ended) {
+        stopLive();
+        if (data.notice) { bubble("bot", data.notice); }
+      }
+    }).catch(function () {
+      liveErrors++;
+      if (liveErrors >= 5) { giveUpLive(); }
+    });
+  }
+  function giveUpLive() {
+    stopLive();
+    bubble("bot", "I lost the connection to our team — they have your details and will follow up.");
   }
 
   /* Scroll-lock the host page behind the full-screen mobile panel; restore
