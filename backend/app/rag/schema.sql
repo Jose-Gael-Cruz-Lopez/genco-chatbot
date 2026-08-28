@@ -109,3 +109,29 @@ create index if not exists kb_documents_managed_by_idx on kb_documents(managed_b
 -- A gap leaves the portal's list once someone publishes an answer for it.
 alter table faq_misses add column if not exists resolved boolean not null default false;
 create index if not exists faq_misses_unresolved_idx on faq_misses(resolved, created_at desc);
+
+-- ── Live agent chat ───────────────────────────────────────────────────────
+-- Exactly one row. Availability is available=true AND a heartbeat inside
+-- AGENT_HEARTBEAT_TTL_SECONDS, so it expires on its own when the tab closes.
+create table if not exists agent_presence (
+  id           text primary key default 'greg',
+  available    boolean not null default false,
+  last_seen_at timestamptz not null default now()
+);
+
+create table if not exists live_chats (
+  id                   uuid primary key default gen_random_uuid(),
+  session_id           uuid not null,
+  lead_id              uuid,
+  status               text not null default 'waiting',  -- waiting|active|ended
+  question             text,
+  started_at           timestamptz not null default now(),
+  accepted_at          timestamptz,
+  -- Updated on every visitor poll; a stale value is how visitor_left is detected
+  -- without a background worker.
+  visitor_last_seen_at timestamptz not null default now(),
+  ended_at             timestamptz,
+  ended_reason         text  -- agent_ended|agent_dropped|visitor_left|not_accepted
+);
+create index if not exists live_chats_status_idx on live_chats(status, started_at);
+create index if not exists live_chats_session_idx on live_chats(session_id, started_at desc);
