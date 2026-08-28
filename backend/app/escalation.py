@@ -60,7 +60,29 @@ def should_escalate(retrieval_scores: list[float],
     return any(k in text.lower() for k in HIGH_RISK_KEYWORDS)
 
 
-def capture_lead(session_id: str, intent: str, fields: dict) -> dict:
+def notify_lead(stored: dict) -> None:
+    """Best-effort notification for an already-stored lead.
+
+    Split out of capture_lead so live chat can store a lead at connect time and
+    notify only when the conversation ends. Failures are flagged in the row and
+    never raised: the lead is already safe in Supabase.
+    """
+    try:
+        if send_lead_notification(stored):
+            get_supabase().table("leads").update({"emailed": True}).eq(
+                "id", stored["id"]).execute()
+    except Exception:
+        log.exception("lead %s email failed", stored.get("id"))
+    try:
+        if create_lead_in_pipedrive(stored):
+            get_supabase().table("leads").update(
+                {"pushed_to_pipedrive": True}).eq("id", stored["id"]).execute()
+    except Exception:
+        log.exception("lead %s pipedrive failed", stored.get("id"))
+
+
+def capture_lead(session_id: str, intent: str, fields: dict,
+                 notify: bool = True) -> dict:
     errors = validate_lead(intent, fields)
     if errors:
         # Log the machine-readable errors; raise the human-readable message, because the
@@ -74,15 +96,8 @@ def capture_lead(session_id: str, intent: str, fields: dict) -> dict:
            "extra": extra, "message": fields.get("question", "")}
     # 1) store first — the lead must never be lost
     stored = get_supabase().table("leads").insert(row).execute().data[0]
-    # 2) notify (best-effort; failures flagged, never raised)
-    try:
-        if send_lead_notification(stored):
-            get_supabase().table("leads").update({"emailed": True}).eq("id", stored["id"]).execute()
-    except Exception:
-        log.exception("lead %s email failed", stored["id"])
-    try:
-        if create_lead_in_pipedrive(stored):
-            get_supabase().table("leads").update({"pushed_to_pipedrive": True}).eq("id", stored["id"]).execute()
-    except Exception:
-        log.exception("lead %s pipedrive failed", stored["id"])
+    # 2) notify (best-effort; failures flagged, never raised). Live chat defers
+    # this until the conversation ends, so the lead carries the transcript.
+    if notify:
+        notify_lead(stored)
     return stored
