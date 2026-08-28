@@ -10,13 +10,14 @@ Each check below is labelled with the mode(s) it applies to.
 
 | Mode | Run these, in this order | Skip |
 |---|---|---|
-| `faq` (default) | **1 → 2 → 10 → 11 → 12 → 13 → 4 → 6 → 7** | 3, 5, 8, 9 (and the cost-cap half of 7) |
+| `faq` (default) | **1 → 2 → 10 → 11 → 12 → 13 → 14 → 4 → 6 → 7** | 3, 5, 8, 9 (and the cost-cap half of 7) |
 | `generative` | **1 → 2 → 3 → 4 → 5 → 6 → 7 → 8** (9 optional) | 10, 11, 12 |
 
 > **On the numbering:** checks 1–9 keep the numbers they have always had — the README and a couple
 > of code comments (`chat/router.py`) reference them by number — so the FAQ-mode checks added with
-> this mode are numbered 10–13 at the end rather than renumbering the file. Read them in the run
-> order above, not top to bottom.
+> this mode are numbered 10–14 at the end rather than renumbering the file. Read them in the run
+> order above, not top to bottom. Checks 13 (portal) and 14 (live chat) apply only when the agent
+> portal is enabled; a launch with `AGENT_PASSWORD` blank skips both.
 
 ---
 
@@ -37,6 +38,10 @@ Confirm in the Table Editor that these all exist:
 - column **`kb_documents.managed_by`** (`text not null default 'file'`) and column
   **`faq_misses.resolved`** (`boolean not null default false`) — the agent portal's ownership
   columns, needed before anything is published (check 13),
+- tables **`agent_presence`** (one row — the availability heartbeat) and **`live_chats`** (one row
+  per live conversation, carrying its `status` and `ended_reason`) — needed before the portal's
+  Live pane is used (check 14). Missing them is safe rather than dangerous: the availability
+  lookup fails closed, so visitors simply get the email flow.
 - functions `match_documents` (generative) and **`match_documents_fts`** (FAQ).
 
 `kb_documents.embedding` is now **nullable** — FAQ mode stores chunks with no vector at all.
@@ -103,9 +108,10 @@ executes. A top score below 0.25 on any fixture query indicates the embeddings o
 
 ---
 
-## 4. Live chat round-trip
+## 4. Chat round-trip and the `/chat` contract
 
-**Applies to: both modes** (the expectations differ; see below).
+**Applies to: both modes** (the expectations differ; see below). For a *live agent* chat — a
+visitor talking to a real person — see check 14.
 
 Start the backend:
 
@@ -122,8 +128,12 @@ curl -s -X POST http://localhost:8000/chat \
   -d '{"message":"Do you ship to New York?"}' | python -m json.tool
 ```
 
-**Every response, in both modes, carries all four contract keys and HTTP 200:**
-`session_id`, `reply`, `retrieval_scores`, `quick_replies`.
+**Every response, in both modes, carries all five contract keys and HTTP 200:**
+`session_id`, `reply`, `retrieval_scores`, `quick_replies`, `live`.
+
+`live` is `false` here and on every ordinary turn — it is `true` only while the visitor is
+mid-conversation with a person (check 14). If it is ever `true` when nobody has the portal's
+availability toggle on, stop and fix that before anything else.
 
 - **FAQ mode:** `reply` is a KB chunk **word for word** (diff it against
   `backend/knowledge_base/shipping_and_tax.md` if unsure — it should match exactly, no summarizing
@@ -436,6 +446,119 @@ whenever the request scheme is `https`, so a plain-HTTP host cannot complete a l
 
 ---
 
+## 14. Live agent chat: the toggle, a real conversation, and all four endings
+
+**Applies to: FAQ mode, when the team will actually use the portal's Live pane.** Skip it if you
+are launching with live chat unused — but still run **step 0**, which is the check that the feature
+is invisible while it is off.
+
+Live chat sits *on top of* the email loop; the loop underneath never goes away. Run check 13 first —
+this needs the same two secrets, plus `agent_presence` and `live_chats` from check 1. Have three
+things open: the portal (`/agent`), the widget (`cd widget && python -m http.server 5500`, then
+`http://localhost:5500/test.html`), and the Supabase table editor. Watch
+`Info@GenerationConscious.co` throughout: **every part of this check ends with an email.**
+
+**0. The control case — with the toggle off, nothing changed.** With the portal's availability
+toggle **off** (or the portal closed, or `AGENT_PASSWORD` blank), ask the widget something the KB
+cannot answer and tap **"✉️ Send my question to the team"**.
+
+Expected: today's guided question flow, unchanged — it asks for your name, then your email, then
+confirms, and the lead lands in Supabase + inbox + Pipedrive exactly as in check 11. There is **no**
+"someone from our team is online" offer anywhere. Confirm the raw contract too:
+
+```bash
+curl -s -X POST http://localhost:8000/chat -H 'Content-Type: application/json' \
+  -d '{"message":"do you ship to New York?"}' | python -m json.tool
+```
+
+Expected: `"live": false`. **A visitor offered a human while nobody is there is the one failure this
+feature must not have** — if that happens, stop and do not launch live chat.
+
+**1. Go available.** Open the portal's **Live** pane and switch availability **on**. Then:
+
+```sql
+select id, available, last_seen_at from agent_presence;
+```
+
+Expected: `available = true`, and `last_seen_at` advancing every ~15 seconds while the tab is open.
+Switch the toggle off and confirm `available` flips to `false`.
+
+**2. A full live chat, end to end (`agent_ended`).** Toggle on. In the widget, ask something
+unanswerable and tap **"✉️ Send my question to the team"**. Expected, in order:
+
+- the bot offers *"Good news — someone from our team is online right now…"* with **💬 Chat with the
+  team now** and **✉️ Just email me** (tapping "Just email me" here would be step 0's flow —
+  it still works, unchanged);
+- **Chat with the team now** asks for an email address;
+- typing `nope` re-prompts for a valid address and does **not** connect;
+- a real address replies *"Thanks — connecting you to our team now…"*, a `live_chats` row appears
+  with `status = 'waiting'`, and a `leads` row appears **immediately** with `intent = question`,
+  `emailed = false`, `pushed_to_pipedrive = false` — stored on purpose, not yet sent;
+- the chat shows up in the portal queue within ~3 seconds, with a sound and a flashing tab title.
+
+Open it in the portal (the row flips to `active`) and type back and forth. Expected: the team's
+replies reach the widget within ~2 seconds, labelled **Generation Conscious team** and visibly not
+the bot; the visitor's messages appear in the portal. **The bot says nothing in between** — a
+message sent during a live chat must not produce an FAQ answer over the top of a person.
+
+Click **End chat**. Expected:
+
+- the widget shows *"Thanks for chatting! Anything else I can look up for you?"* and stops polling;
+- `live_chats.status = 'ended'`, `ended_reason = 'agent_ended'`;
+- **an email arrives at `Info@GenerationConscious.co` carrying the whole transcript**, both sides of
+  it, and the `leads` row now reads `emailed = true`, `pushed_to_pipedrive = true`;
+- a Person and a Deal appear in Pipedrive;
+- the next thing typed in the widget is answered normally by the FAQ again.
+
+**3. `not_accepted` — nobody opens it.** With the toggle on, start another chat from the widget and
+simply do not open it in the portal for 60+ seconds (`LIVE_ACCEPT_TIMEOUT_SECONDS`).
+
+Expected: the widget shows *"Our team just stepped away — they have your email and will follow up
+personally."*, `ended_reason = 'not_accepted'`, and **the lead email arrives** with the transcript
+so far.
+
+**4. `agent_dropped` — the team disappears mid-chat.** Start a chat, open it in the portal, exchange
+one message, then **close the portal tab** and wait ~45 seconds (`AGENT_HEARTBEAT_TTL_SECONDS`).
+
+Expected: the widget shows *"Looks like we got disconnected — our team has your email and will
+follow up personally."*, `ended_reason = 'agent_dropped'`, and **the lead email arrives** with the
+transcript. This is the ending that matters most — it is what a closed laptop lid does.
+
+**5. `visitor_left` — the visitor disappears mid-chat.** Start a chat, open it in the portal, then
+**close the widget's tab** and leave the portal open for 2+ minutes (`LIVE_VISITOR_IDLE_SECONDS`),
+refreshing the queue.
+
+Expected: the chat drops out of the portal queue, `ended_reason = 'visitor_left'`, and **the lead
+email arrives** with the transcript. The visitor is gone, but they gave an email before connecting,
+so they are still reachable — which is the entire reason the email is collected first.
+
+**6. Count them.** After steps 2–5:
+
+```sql
+select ended_reason, count(*) from live_chats group by ended_reason;
+select intent, emailed, pushed_to_pipedrive, left(message, 60) as msg
+from leads order by created_at desc limit 4;
+```
+
+Expected: all four reasons present, and **four** leads — one per chat, each `emailed = true`, each
+`message` starting `Live chat (<reason>)` and carrying the transcript. **One chat, one lead, one
+email, exactly once.** A chat with no lead behind it is a visitor nobody will ever follow up with;
+if you find one, do not launch live chat.
+
+**7. The poll never 500s.** A polling loop has no way to recover from a 500, so the visitor endpoint
+answers 200 even for a session with nothing going on:
+
+```bash
+curl -s -w '\n%{http_code}\n' \
+  "http://localhost:8000/live/messages?session_id=11111111-1111-1111-1111-111111111111"
+```
+
+Expected: **200** and `{"messages": [], "ended": true, "reason": null, "notice": null,
+"error": false}`.
+
+---
+
 Checks 1, 2, 4, 6, 7 (rate limit), 10, 11, and 12 passing = **FAQ mode is production-ready**;
-add 13 when the agent portal is enabled.
+add 13 when the agent portal is enabled, and 14 when the team will use its Live pane (step 0 of 14
+is worth running either way — it proves live chat stays invisible while the toggle is off).
 Checks 1–8 passing = generative mode is production-ready; check 9 is an optional deeper gate there.
