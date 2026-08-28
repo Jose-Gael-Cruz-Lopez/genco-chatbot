@@ -38,6 +38,12 @@ class Settings(BaseSettings):
     # closed rather than exposing visitor questions to the internet.
     AGENT_PASSWORD: str = ""
     AGENT_SESSION_SECRET: str = ""
+    # Live chat timing. The heartbeat TTL is three missed 15s heartbeats: closing
+    # the portal tab therefore takes the team offline on its own, so nobody can
+    # leave themselves "available" overnight and strand a visitor.
+    AGENT_HEARTBEAT_TTL_SECONDS: int = 45
+    LIVE_ACCEPT_TIMEOUT_SECONDS: int = 60
+    LIVE_VISITOR_IDLE_SECONDS: int = 120
     # Dev default — must stay identical to .env.example and the README env table.
     # Includes both spellings of the widget test origin (localhost and 127.0.0.1 are
     # DIFFERENT CORS origins). Production overrides this with exactly
