@@ -29,3 +29,15 @@ def test_agent_portal_settings_read_env(monkeypatch):
     s = Settings()
     assert s.AGENT_PASSWORD == "hunter2"
     assert s.AGENT_SESSION_SECRET == "s3cret"
+
+
+def test_live_chat_timeout_defaults():
+    s = Settings()
+    assert s.AGENT_HEARTBEAT_TTL_SECONDS == 45
+    assert s.LIVE_ACCEPT_TIMEOUT_SECONDS == 60
+    assert s.LIVE_VISITOR_IDLE_SECONDS == 120
+
+
+def test_live_chat_timeouts_read_env(monkeypatch):
+    monkeypatch.setenv("AGENT_HEARTBEAT_TTL_SECONDS", "30")
+    assert Settings().AGENT_HEARTBEAT_TTL_SECONDS == 30
