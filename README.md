@@ -12,6 +12,12 @@ against the knowledge base with Postgres full-text search, and the reply is the 
 After every answer it asks "did that answer your question?"; a "No" sends the question to the team
 as a lead. That is the honest claim to make to schools and other AI-wary buyers.
 
+When someone from the team has the portal at `/agent` open **with the availability toggle on**, a
+question the FAQ cannot answer can hand the visitor to a real person in the same widget instead of
+to an email form. That offer exists *only* while that toggle is on and the portal's heartbeat is
+fresh. With it off — the normal state — the bot behaves exactly as described above, and no visitor
+is ever offered a human who isn't there. See [Live chat](#live-chat).
+
 The original generative (LLM) pipeline is still in the codebase, retained behind
 `BOT_MODE=generative`. Everything in this guide marked **generative mode only** is irrelevant
 while the default is running.
@@ -51,7 +57,9 @@ Widget (vanilla JS + quick-reply buttons) ──POST /chat──> FastAPI backen
                                                                  └─ observability  LangFuse tracing of every turn
 
 Team browser (portal.html) ───────────────POST /agent/*──> FastAPI backend
-                                                            └─ agent/  signed-cookie auth, FAQ gaps, publish to KB
+                                                            ├─ agent/  signed-cookie auth, FAQ gaps, publish to KB
+                                                            └─ live/   presence heartbeat, chat lifecycle, agent relay
+                                                                       (visitor side: GET /live/messages, polled at 2s)
 ```
 
 Rate limiting, the UUID session guard, and the store-first lead pipeline run identically in both
@@ -59,16 +67,21 @@ modes — FAQ mode routes through the same entry code.
 
 ### The `/chat` contract
 
-`POST /chat` returns the same four keys on **every** path, always HTTP 200:
+`POST /chat` returns the same five keys on **every** path, always HTTP 200:
 
 ```json
-{"session_id": "…", "reply": "…", "retrieval_scores": [0.42], "quick_replies": ["…"]}
+{"session_id": "…", "reply": "…", "retrieval_scores": [0.42], "quick_replies": ["…"], "live": false}
 ```
 
 `quick_replies` is the list of buttons the widget renders under the bot message; tapping one sends
 its label as an ordinary user message. It is always present and is an empty list in generative
 mode. In FAQ mode `retrieval_scores` carries `ts_rank` values (not cosine similarities) — same
 shape, different scale.
+
+`live` is `true` only while the visitor is mid-conversation with a real person. On those turns
+`reply` is `""` — the bot stays quiet rather than answering over a human — and the widget polls
+`GET /live/messages` for the team's replies instead. It is `false` on every other path, in both
+modes, including whenever nobody is available. See [Live chat](#live-chat).
 
 ---
 
@@ -146,6 +159,9 @@ lead end-to-end against production and do the **mobile + desktop QA** pass.
   `/agent`, where each gap has a **Publish to FAQ** box — see
   [Agent portal](#agent-portal-agent). Reading `faq_misses` straight from the Supabase table
   editor still works and needs no secrets — see [The FAQ backlog](#the-faq-backlog-faq_misses).
+  The same portal carries the **Live** pane: switch availability on and the bot starts offering
+  visitors a real person instead of an email form — see [Live chat](#live-chat). Leaving it off is
+  a complete configuration; nothing about the visitor's experience changes until someone flips it.
 - **Generative mode only:** set the CI secret (`gh secret set OPENAI_API_KEY`) to activate the
   faithfulness gate, and add `requirements-ml.txt` to the image on an instance sized **~1–2 GB**
   to run the ML injection scanner (see
@@ -220,6 +236,9 @@ Railway/Fly) dashboard as service environment variables.
 | `RATE_LIMIT_PER_MINUTE` | Max chat requests per IP per minute (default: `20`). Applies in **both** modes. | Tune based on traffic |
 | `AGENT_PASSWORD` | Shared password for the agent portal at `/agent`. Blank (the default) disables the portal — every `/agent` route returns 503. | Pick one and give it to the team |
 | `AGENT_SESSION_SECRET` | Signs the portal's session cookie. Blank also disables the portal. Keep it stable: rotating it signs everyone out. | Generate once: `python -c "import secrets;print(secrets.token_urlsafe(48))"` |
+| `AGENT_HEARTBEAT_TTL_SECONDS` | How long a portal heartbeat counts as "someone is here" (default `45` — three missed 15-second beats). Live chat is offered only inside this window, so closing the portal tab takes the team offline on its own. | Leave at the default |
+| `LIVE_ACCEPT_TIMEOUT_SECONDS` | How long a waiting chat goes unopened before it ends as `not_accepted` and the lead is emailed (default `60`). | Leave at the default |
+| `LIVE_VISITOR_IDLE_SECONDS` | How long without a visitor poll before a chat ends as `visitor_left` and the lead is emailed (default `120`). | Leave at the default |
 
 ### Generative mode only
 
@@ -529,6 +548,67 @@ duplicating it. `content_tsv` is a generated column, so the entry is searchable 
 insert commits: **no re-ingest, no redeploy.** The `faq_misses` rows behind that gap are then
 marked `resolved = true`, which is what takes it off the list.
 
+### Live chat
+
+The portal's **Live** pane lets the team answer a visitor in the widget in real time instead of by
+email. It is deliberately hard to leave switched on by accident, and impossible to exit without
+leaving a lead behind.
+
+**It is offered only while someone is actually there.** The pane has one availability toggle. While
+it is on, the portal posts `POST /agent/heartbeat` every 15 seconds, and the team counts as
+reachable only when that toggle is on **and** the last heartbeat is inside
+`AGENT_HEARTBEAT_TTL_SECONDS` (45s — three missed beats). Closing the tab, losing the network, or
+shutting the laptop therefore takes the team offline within 45 seconds without anyone having to
+remember to flip anything back. Any error looking presence up counts as *unavailable*: the failure
+direction is the email path, which always works.
+
+**With the toggle off — the normal state — nothing changes for visitors.** Tapping "✉️ No — ask the
+team" starts exactly today's guided question flow (name → email → lead), byte for byte. The live
+conversation states are unreachable, `/chat` returns `live: false` on every turn, and the widget
+never polls. A deploy with the portal disabled entirely (`AGENT_PASSWORD` blank) behaves the same
+way. **No visitor is ever offered a human who isn't there.**
+
+**With the toggle on**, a visitor who taps "✉️ No — ask the team" (or "✉️ Send my question to the
+team" after a no-match) is asked first. That feedback tap is the *only* trigger — the greeting's
+"Question for the team" button still goes straight to the guided question flow, as it always has:
+
+> Good news — someone from our team is online right now. Would you like to talk to them directly?
+
+under two buttons: **💬 Chat with the team now** and **✉️ Just email me**. "Just email me" is the
+existing question flow, unchanged. "Chat with the team now" asks for an email address **before**
+connecting, stores it as a `question` lead immediately — store-first, deliberately *not yet*
+notified — opens a `live_chats` row as `waiting`, and the widget starts polling `GET /live/messages`
+every 2 seconds. From then until the chat ends the bot is silent: the visitor's messages are stored
+for the team to read and are **not** matched against the FAQ.
+
+If storing that lead fails, the chat does not start at all — the visitor drops into the ordinary
+email flow instead. Never start a conversation you cannot follow up on.
+
+**Every ending emails a lead carrying the transcript.** A chat ends exactly one of four ways, and
+all four write the full conversation onto the lead's `message` field (prefixed `Live chat
+(<reason>)`) and then send it to `Info@GenerationConscious.co` and Pipedrive:
+
+| `ended_reason` | Happens when | What the visitor sees |
+|---|---|---|
+| `agent_ended` | the team clicks **End chat** | "Thanks for chatting! Anything else I can look up for you?" |
+| `agent_dropped` | the heartbeat goes stale mid-chat — tab closed, laptop shut, network dropped | "Looks like we got disconnected — our team has your email and will follow up personally." |
+| `not_accepted` | nobody opened it within `LIVE_ACCEPT_TIMEOUT_SECONDS` (60s) | "Our team just stepped away — they have your email and will follow up personally." |
+| `visitor_left` | no visitor poll for `LIVE_VISITOR_IDLE_SECONDS` (120s) | usually nothing, they have gone; if the tab comes back, "That chat timed out." |
+
+One chat produces one lead and one email, exactly once. **There is no exit from a live chat that
+leaves the visitor un-followed-up** — that is the property that makes offering live chat safe at
+all, and it is why the email loop underneath is never removed.
+
+Timeouts are applied **lazily, on read**: every poll from either side sweeps the chat and ends it if
+a deadline has passed. So there is no scheduler and no background worker, and a Render restart
+mid-conversation is invisible — all the state is in Postgres, not in a connection.
+
+**Still zero AI.** Nothing under `backend/app/live/` imports a model or an embedding client. Live
+chat is two people typing; the anti-AI claim survives it intact.
+
+The database needs the live tables — re-apply `backend/app/rag/schema.sql` in the Supabase SQL
+editor to add `agent_presence` and `live_chats`. The whole file is re-runnable.
+
 ---
 
 ## Managing Cost
@@ -608,6 +688,12 @@ If either notification fails, the Supabase row persists with `emailed=false` or
 In FAQ mode the fields are collected one at a time by the guided flow in `backend/app/chat/flows.py`
 (validated per field, "cancel" exits); in generative mode the model emits a `capture_lead` tool call
 that the server validates. Both call the same `capture_lead()`.
+
+A live chat is the one case where storing and notifying happen at different moments. The row is
+written the instant the visitor hands over their email — `capture_lead(..., notify=False)` — so they
+are reachable even if they close the tab mid-sentence; the email and the Pipedrive push happen when
+the chat ends, via `notify_lead()`, carrying the full transcript and the reason it ended. Every one
+of the four endings runs that step. See [Live chat](#live-chat).
 
 ---
 
@@ -727,6 +813,9 @@ genco-chatbot/
 │   │   ├── injection_scanner.py # optional ML injection scanner (LLM Guard, lazy, generative)
 │   │   ├── agent/               # auth.py (signed-cookie login), faq_gaps.py (backlog +
 │   │   │                        #   publishing), router.py (/agent routes)
+│   │   ├── live/                # presence.py (heartbeat + availability), chats.py (chat
+│   │   │                        #   lifecycle + lazy timeout sweep), router.py
+│   │   │                        #   (GET /live/messages — the visitor's poll)
 │   │   ├── rag/                 # fts.py (FAQ full-text match), embeddings.py, ingest.py,
 │   │   │                        #   retrieve.py (generative), schema.sql
 │   │   └── chat/                # router.py (mode branch), flows.py (FAQ state machine),
@@ -740,12 +829,14 @@ genco-chatbot/
 ├── eval/                        # run_eval.py + test_set.jsonl (repo root — run from here)
 ├── widget/
 │   ├── dist/
-│   │   └── widget.js            # embed widget (single hand-authored file, renders quick replies)
+│   │   └── widget.js            # embed widget (single hand-authored file; quick replies +
+│   │                             #   live agent bubbles)
 │   ├── test.html                # widget QA page (offline stub via ?stub=1)
 │   └── stub_server.py           # zero-key stub backend for widget QA (canned FAQ conversation)
 ├── portal/
 │   └── dist/
-│       └── portal.html          # agent portal (single self-contained file, served at /agent)
+│       └── portal.html          # agent portal (single self-contained file, served at /agent;
+│                                 #   Live pane + FAQ gaps pane)
 ├── render.yaml                  # Render Blueprint (repo root; dockerContext: .)
 ├── .env.example                 # template — copy to backend/.env
 ├── VERIFICATION.md              # deferred live-key checks
@@ -757,4 +848,5 @@ The Supabase schema lives at `backend/app/rag/schema.sql` (there is no `backend/
 lead logic is flat modules under `backend/app/` — there are no `leads/` or `guardrails/` packages.
 Re-applying the whole schema file is safe and idempotent; it upgrades an existing project in place
 with the FAQ objects (`content_tsv` + GIN index, `match_documents_fts`, `chat_sessions.flow_state`,
-`faq_misses`) and the agent-portal columns (`kb_documents.managed_by`, `faq_misses.resolved`).
+`faq_misses`), the agent-portal columns (`kb_documents.managed_by`, `faq_misses.resolved`), and the
+live chat tables (`agent_presence`, `live_chats`).
