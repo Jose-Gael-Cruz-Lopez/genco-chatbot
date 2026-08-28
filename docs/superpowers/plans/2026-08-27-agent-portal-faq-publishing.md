@@ -1,5 +1,11 @@
 # Agent Portal & FAQ Publishing Implementation Plan
 
+**Status:** ✅ Completed 2026-08-27. Test suite went 161 → 202 passing. Includes the `managed_by` fix that stops a re-ingest deleting portal-authored FAQ entries.
+
+> Per-step `git commit` blocks below were executed as granular per-file commits by the
+> orchestrator rather than run verbatim; every other step ran as written.
+
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Give Greg a password-protected portal where he sees every question the FAQ couldn't answer and turns each one into a permanent FAQ entry — so the same question never reaches him twice.

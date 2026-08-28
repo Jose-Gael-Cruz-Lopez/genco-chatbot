@@ -1,5 +1,11 @@
 # FAQ-Match Mode Implementation Plan
 
+**Status:** ✅ Completed 2026-08-27. Test suite went 108 → 161 passing. Shipped in commits `f128f46`..`280c224`.
+
+> Per-step `git commit` blocks below were executed as granular per-file commits by the
+> orchestrator rather than run verbatim; every other step ran as written.
+
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Make the Genco chatbot answer from the FAQ knowledge base with **zero AI calls** — Postgres full-text match returns verbatim GC-written answers, asks "did that answer your question?", and routes a "No" to the team as a lead.
