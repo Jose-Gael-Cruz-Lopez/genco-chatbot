@@ -1,3 +1,6 @@
+from unittest.mock import MagicMock, patch
+
+from app import escalation
 from app.escalation import is_lead_flow_turn, should_escalate
 
 
@@ -81,3 +84,42 @@ def test_greeting_is_not_a_field_request():
         "How can we support your sustainability journey? "
         "Buy Sheets / Buy Refill Stations / Question for the team")}]
     assert is_lead_flow_turn(history) is False
+
+
+# --- notification split: store now, notify later (live chat defers the email) ---
+
+def test_capture_lead_can_store_without_notifying():
+    stored = {"id": "lead-1", "intent": "question", "email": "a@b.co"}
+    sb = MagicMock()
+    sb.table.return_value.insert.return_value.execute.return_value = MagicMock(
+        data=[stored])
+    with patch("app.escalation.get_supabase", return_value=sb), \
+         patch("app.escalation.send_lead_notification") as email, \
+         patch("app.escalation.create_lead_in_pipedrive") as crm:
+        escalation.capture_lead("s", "question",
+                                {"name": "A", "email": "a@b.co", "question": "q"},
+                                notify=False)
+    email.assert_not_called()
+    crm.assert_not_called()
+
+
+def test_notify_lead_sends_email_and_pushes_to_pipedrive():
+    stored = {"id": "lead-1", "intent": "question", "email": "a@b.co"}
+    sb = MagicMock()
+    with patch("app.escalation.get_supabase", return_value=sb), \
+         patch("app.escalation.send_lead_notification", return_value=True) as email, \
+         patch("app.escalation.create_lead_in_pipedrive", return_value=True) as crm:
+        escalation.notify_lead(stored)
+    email.assert_called_once_with(stored)
+    crm.assert_called_once_with(stored)
+
+
+def test_notify_lead_never_raises_when_both_channels_fail():
+    stored = {"id": "lead-1", "intent": "question"}
+    sb = MagicMock()
+    with patch("app.escalation.get_supabase", return_value=sb), \
+         patch("app.escalation.send_lead_notification",
+               side_effect=RuntimeError("resend down")), \
+         patch("app.escalation.create_lead_in_pipedrive",
+               side_effect=RuntimeError("pipedrive down")):
+        escalation.notify_lead(stored)  # must not raise
