@@ -31,7 +31,8 @@ def test_faq_turn_returns_the_frozen_contract(faq_client):
         r = client.post("/chat", json={"session_id": SID, "message": "hi"})
     assert r.status_code == 200
     body = r.json()
-    assert set(body) == {"session_id", "reply", "retrieval_scores", "quick_replies"}
+    assert set(body) == {"session_id", "reply", "retrieval_scores", "quick_replies",
+                         "live"}
     assert body["reply"] == "An answer."
     assert body["quick_replies"] == ["A", "B"]
     assert body["retrieval_scores"] == [0.5]
@@ -71,3 +72,31 @@ def test_rate_limit_still_applies_in_faq_mode(faq_client):
     assert r.status_code == 200
     assert "quickly" in r.json()["reply"]
     assert r.json()["quick_replies"] == []
+
+
+def test_chat_response_carries_the_live_flag(faq_client):
+    client, _ = faq_client
+    with patch("app.chat.router.flows.handle_turn",
+               return_value=("", [], {"state": "live", "chat_id": "c1"}, [])):
+        body = client.post("/chat", json={"session_id": SID, "message": "hi"}).json()
+    assert body["live"] is True
+    assert set(body) == {"session_id", "reply", "retrieval_scores",
+                         "quick_replies", "live"}
+
+
+def test_live_is_false_on_an_ordinary_turn(faq_client):
+    client, _ = faq_client
+    with patch("app.chat.router.flows.handle_turn",
+               return_value=("An answer.", [], None, [0.5])):
+        assert client.post("/chat", json={"session_id": SID,
+                                          "message": "hi"}).json()["live"] is False
+
+
+def test_an_empty_live_reply_is_not_saved_as_a_bot_message(faq_client):
+    client, _ = faq_client
+    with patch("app.chat.router.flows.handle_turn",
+               return_value=("", [], {"state": "live"}, [])), \
+         patch("app.chat.router.memory.save_message") as save:
+        client.post("/chat", json={"session_id": SID, "message": "hi"})
+    # only the visitor's own message is stored; no empty bot bubble
+    assert all(c[0][1] != "assistant" for c in save.call_args_list)

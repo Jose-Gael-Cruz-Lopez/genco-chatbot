@@ -5,7 +5,7 @@ widget/test.html exercises the widget against the stub, so the stub's canned
 FastAPI backend's frozen contracts:
 
     POST /chat               -> {"session_id", "reply", "retrieval_scores",
-                                 "quick_replies"}
+                                 "quick_replies", "live"}
     GET  /history?session_id -> {"session_id", "messages": [{"role", "content", "created_at"}]}
 
 The stub is started on an ephemeral loopback port; the real backend is served
@@ -36,9 +36,10 @@ _spec.loader.exec_module(stub_server)
 
 client = TestClient(app)
 
-# quick_replies is additive: the real backend sends it on every path, and the stub
-# picks it up with the widget's quick-reply rendering. Either way the stub must carry
-# the frozen core and invent no key the real backend does not send.
+# quick_replies and live are additive: the real backend sends both on every path.
+# The stub picks up quick_replies with the widget's quick-reply rendering and has no
+# live chat to model, so it may omit live — but either way the stub must carry the
+# frozen core and invent no key the real backend does not send.
 _FROZEN_CHAT_KEYS = {"session_id", "reply", "retrieval_scores"}
 
 
@@ -108,7 +109,7 @@ def test_stub_chat_matches_real_chat_schema(stub_port):
     stub = _stub_post_chat(stub_port, {"message": "buy sheets",
                                        "session_id": "contract-chat"})
     real = _real_chat_response()
-    assert set(real) == _FROZEN_CHAT_KEYS | {"quick_replies"}
+    assert set(real) == _FROZEN_CHAT_KEYS | {"quick_replies", "live"}
     assert _FROZEN_CHAT_KEYS <= set(stub) <= set(real)
     for body in (stub, real):
         assert isinstance(body["session_id"], str) and body["session_id"]

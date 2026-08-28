@@ -72,9 +72,9 @@ def test_lead_capture_success(mem, _ret, _llm, mock_capture):
     assert resp.status_code == 200
     body = resp.json()
 
-    # Response must have exactly the four frozen keys
+    # Response must have exactly the five frozen keys
     assert set(body.keys()) == {"session_id", "reply", "retrieval_scores",
-                                "quick_replies"}
+                                "quick_replies", "live"}
     assert body["session_id"] == "sess-lead-1"
     # Reply must be the confirmation string
     assert body["reply"] == (
@@ -110,9 +110,9 @@ def test_lead_capture_validation_reprompt(mem, _ret, _llm, mock_capture):
     assert resp.status_code == 200
     body = resp.json()
 
-    # Response shape must still be the frozen four keys
+    # Response shape must still be the frozen five keys
     assert set(body.keys()) == {"session_id", "reply", "retrieval_scores",
-                                "quick_replies"}
+                                "quick_replies", "live"}
     # Reply must contain the re-prompt text with the missing field info
     assert "missing required field: estimated_sheets" in body["reply"]
     assert "I still need a bit more info" in body["reply"]
@@ -133,7 +133,7 @@ def test_weak_retrieval_forces_escalation(mem, _ret, _llm):
     assert resp.status_code == 200
     body = resp.json()
     assert set(body.keys()) == {"session_id", "reply", "retrieval_scores",
-                                "quick_replies"}
+                                "quick_replies", "live"}
     assert body["reply"] == chat_router._ESCALATION_REPLY
     assert "Here is an off-topic answer" not in body["reply"]
 
@@ -236,7 +236,7 @@ def test_malformed_tool_json_reprompts_not_500(mem, _ret, _llm, mock_capture):
     assert resp.status_code == 200
     body = resp.json()
     assert set(body.keys()) == {"session_id", "reply", "retrieval_scores",
-                                "quick_replies"}
+                                "quick_replies", "live"}
     assert body["reply"] == chat_router._TOOL_REPROMPT_REPLY
     mock_capture.assert_not_called()
 
@@ -274,7 +274,7 @@ def test_capture_lead_unexpected_error_offers_contact_fallback(mem, _ret, _llm,
     assert resp.status_code == 200
     body = resp.json()
     assert set(body.keys()) == {"session_id", "reply", "retrieval_scores",
-                                "quick_replies"}
+                                "quick_replies", "live"}
     # the human path is offered instead of a raw error
     assert "Info@GenerationConscious.co" in body["reply"]
     assert "(516) 619-6174" in body["reply"]
@@ -296,7 +296,7 @@ def test_double_llm_failure_returns_contact_info_not_500(mem, _ret, _llm):
     assert resp.status_code == 200
     body = resp.json()
     assert set(body.keys()) == {"session_id", "reply", "retrieval_scores",
-                                "quick_replies"}
+                                "quick_replies", "live"}
     assert "Info@GenerationConscious.co" in body["reply"]
     assert body["retrieval_scores"] == [0.8]
     assert _llm.call_count == 2  # primary attempted, then fallback attempted
@@ -401,7 +401,7 @@ def test_cost_cap_returns_static_reply_without_calling_llm(mem, mock_llm):
     assert resp.status_code == 200
     body = resp.json()
     assert set(body.keys()) == {"session_id", "reply", "retrieval_scores",
-                                "quick_replies"}
+                                "quick_replies", "live"}
     assert body["reply"] == ("I'm momentarily unavailable. Please email "
                              "Info@GenerationConscious.co and the team will help.")
     assert body["retrieval_scores"] == []
@@ -431,7 +431,7 @@ def test_primary_failure_retries_with_fallback_model(mem, _ret):
     assert resp.status_code == 200
     body = resp.json()
     assert set(body.keys()) == {"session_id", "reply", "retrieval_scores",
-                                "quick_replies"}
+                                "quick_replies", "live"}
     # The reply comes from the fallback result, not an error message.
     assert body["reply"] == "Fallback answer."
     assert mock_llm.call_count == 2
