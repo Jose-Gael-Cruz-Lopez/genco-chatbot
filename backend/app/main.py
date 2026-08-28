@@ -29,6 +29,9 @@ app.include_router(chat_router)
 from app.agent.router import router as agent_router
 app.include_router(agent_router)
 
+from app.live.router import router as live_router
+app.include_router(live_router)
+
 _widget_dir = Path(__file__).resolve().parent.parent.parent / "widget" / "dist"
 if _widget_dir.exists():
     app.mount("/widget", StaticFiles(directory=str(_widget_dir)), name="widget")
